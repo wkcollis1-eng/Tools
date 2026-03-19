@@ -27,7 +27,7 @@ python --version
 ```
 Required for `install-precommit-all.ps1`. Python 3.9+ is fine.
 
-### GitHub CLI (`gh`) — required for `create-release.ps1`
+### GitHub CLI (`gh`) — required for `create-release.ps1`, `create-issue.ps1`, and `monthly-update.ps1`
 ```powershell
 gh --version
 ```
@@ -216,6 +216,90 @@ Hooks included:
 
 ---
 
+### `create-issue.ps1`
+Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisites).
+
+```powershell
+.\create-issue.ps1 -Repo home-assistant-config -Title "Fix DST in climate_norms_today.py"
+.\create-issue.ps1 -Repo Residential-HVAC-Performance-Baseline- -Title "Add March 2026 data" -OpenInBrowser
+.\create-issue.ps1 -Repo home-assistant-config -Title "Cooling build-out" -BodyFile "C:\repos\tools\issue_body.md"
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Repo` | Yes | Exact repo name (case-sensitive — see valid list in script) |
+| `-Title` | Yes | Issue title |
+| `-Body` | No | Issue body as an inline string |
+| `-BodyFile` | No | Path to a `.md` file to use as the issue body — use this for long issues like build-out plans |
+| `-OpenInBrowser` | No | Switch. Opens the new issue URL in your browser immediately |
+
+> **Note:** If neither `-Body` nor `-BodyFile` is provided, `gh` opens your configured editor so you can write the body interactively. `-BodyFile` is the recommended approach for issues that already exist as Markdown documents (e.g. `GITHUB_ISSUE_1_COOLING_BUILDOUT.md`).
+
+---
+
+### `validate-all.ps1`
+Runs `validate_month.py` from the `Residential-HVAC-Performance-Baseline-` repo. Validates all months in the CSV history by default, or a specific month. **Exits 1 if any HALT-level check fails** — safe to use as a gate before committing monthly data.
+
+```powershell
+.\validate-all.ps1                    # validate all months
+.\validate-all.ps1 -Month 2026-03     # validate March 2026 only
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Month` | No | Month to validate. Accepts `YYYY-MM` or `YYYY-MM-01`. Omit to validate all months |
+
+**Checks run (V-HVAC-1 through V-HVAC-8):**
+- V-HVAC-1 — Runtime/HDD within ±2σ of trailing 3-month history
+- V-HVAC-2 — Heating efficiency within ±15% of 90.3 CCF/1kHDD baseline
+- V-HVAC-3 — Space heat CCF / HDD coherence (implied UA ±5% of 480 BTU/hr-°F)
+- V-HVAC-4 — Monthly HDD65 vs 5,270 annual normal
+- V-HVAC-5 — Zone balance 1F/2F within 45–55% (heating season only)
+- V-HVAC-6 — DHW CCF ≤ prior-year same month +5%
+- V-HVAC-7 — `daily_temperature.csv` row count = days in month
+- V-HVAC-8 — `monthly_hvac_runtime.csv` has exactly 2 rows per month
+
+Output levels: `✅ PASS`, `⚠️ WARN`, `🚩 FLAG`, `🛑 HALT`. HALT stops the exit code at 1; WARN and FLAG are informational and allow the commit to proceed.
+
+---
+
+### `monthly-update.ps1`
+Orchestrates the full 1st-of-month data entry workflow as two distinct phases. Requires `gh`.
+
+**Phase 1 — before the Claude Code session:**
+Pulls all repos, validates existing data, and creates a work queue issue with a pre-filled checklist.
+
+```powershell
+.\monthly-update.ps1 -Month 2026-03 -Phase 1
+```
+
+**Phase 2 — after the Claude Code session:**
+Validates the newly entered month, tags releases for repos with new commits, and pushes everything.
+
+```powershell
+.\monthly-update.ps1 -Month 2026-03 -Phase 2 -Tag v2026.03.1
+.\monthly-update.ps1 -Month 2026-03 -Phase 2 -Tag v2026.03.1 -DraftRelease   # review before publishing
+.\monthly-update.ps1 -Month 2026-03 -Phase 2 -SkipRelease                    # push without tagging
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Month` | Yes | Month being entered. Accepts `YYYY-MM` or `YYYY-MM-01` |
+| `-Phase` | Yes | `1` (pre-session) or `2` (post-session) |
+| `-Tag` | Phase 2 | CalVer release tag, e.g. `v2026.03.1`. Required unless `-SkipRelease` |
+| `-SkipRelease` | No | Switch. Skip release tagging in Phase 2 (push only) |
+| `-DraftRelease` | No | Switch. Create releases as drafts for review before publishing |
+
+Phase 2 is smart about releases — it checks `git rev-list` for each repo and only tags repos that have new commits since their last tag. Repos with no changes are skipped automatically.
+
+---
+
 ## Daily workflow
 
 ```powershell
@@ -237,22 +321,21 @@ cd C:\repos\tools
 
 ## Monthly update workflow
 
-On the 1st of each month after utility bills arrive:
+On the 1st of each month after utility bills arrive, `monthly-update.ps1` handles the full sequence:
 
 ```powershell
-# 1. Pull everything
-.\pull-all-repos.ps1
+# Before your Claude Code session:
+.\monthly-update.ps1 -Month 2026-03 -Phase 1
+# (pulls all repos, validates data, opens a work queue issue with checklist)
 
-# 2. Run the monthly update Claude Code session
-#    (enters bill data, updates CSVs, commits across repos)
+# Run your Claude Code session to enter bill data and update CSVs
 
-# 3. Create releases for repos that changed
-.\create-release.ps1 -Repo home-assistant-config -Tag v2025.06.1 -Title "June 2025 monthly update"
-.\create-release.ps1 -Repo Residential-HVAC-Performance-Baseline- -Tag v2025.06.1 -Title "June 2025 monthly update"
-
-# 4. Push everything
-.\push-all-repos.ps1
+# After your Claude Code session:
+.\monthly-update.ps1 -Month 2026-03 -Phase 2 -Tag v2026.03.1
+# (validates the new month, tags releases for changed repos, pushes everything)
 ```
+
+If validation fails in Phase 2 with a HALT, the script stops before tagging or pushing. Fix the data error, then re-run Phase 2.
 
 ---
 
@@ -287,7 +370,10 @@ C:\repos\
 │   ├── status-all-repos.ps1
 │   ├── deploy-to-ha.ps1
 │   ├── install-precommit-all.ps1
-│   └── create-release.ps1
+│   ├── create-release.ps1
+│   ├── create-issue.ps1
+│   ├── validate-all.ps1
+│   └── monthly-update.ps1
 ├── home-assistant-config\
 ├── Residential-HVAC-Performance-Baseline-\
 ├── Lifepo4-Battery-Banks\
@@ -312,6 +398,18 @@ GitHub CLI is not installed or not on PATH. Install from https://cli.github.com 
 
 **`create-release.ps1` fails with "release already exists"**
 A tag with that name was already pushed. Either delete the tag on GitHub and re-run, or increment the patch number (e.g. `v2025.06.2`).
+
+**`validate-all.ps1` reports "validate_month.py not found"**
+The `Residential-HVAC-Performance-Baseline-` repo hasn't been cloned or pulled. Run `.\pull-all-repos.ps1` first.
+
+**`validate-all.ps1` exits with HALT**
+One or more months have data integrity issues — the output will identify which check (V-HVAC-1 through V-HVAC-8) failed and why. Fix the CSV data for the flagged month and re-run before committing. Do not bypass a HALT.
+
+**`monthly-update.ps1` stops at Phase 2 before pushing**
+Validation failed with a HALT. Fix the data error in the relevant CSV, commit the fix, then re-run `.\monthly-update.ps1 -Month YYYY-MM -Phase 2 -Tag vYYYY.MM.N`.
+
+**`create-issue.ps1` fails silently or creates an empty issue**
+If neither `-Body` nor `-BodyFile` is provided and no editor is configured, `gh` may create an issue with an empty body. Set a default editor: `gh config set editor notepad` and re-run.
 
 **`git pull` reports merge conflicts**
 Do not force-push. Resolve conflicts manually in the affected file, then `git add` and `git commit`. If Claude Code made the conflicting commit, check CLAUDE.md for the session rules that govern how it handles existing content.
