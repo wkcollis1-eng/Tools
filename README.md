@@ -23,6 +23,20 @@ These rules are non-negotiable. The scripts enforce them where possible; the res
 
 ---
 
+## System guarantees
+
+What this toolkit actively enforces — as opposed to what it relies on discipline for:
+
+- **No partial deploys to HA.** `deploy-to-ha.ps1` verifies SHA-256 hashes after every copy and aborts with a hard error if any mismatch is detected. HA shell commands are not reloadable until all copies verify clean.
+- **No release tagging on invalid data.** `monthly-update.ps1` Phase 2 runs `validate-all.ps1` before tagging or pushing. A HALT-level failure stops the sequence entirely.
+- **No cross-repo drift in repo list.** `repos.ps1` is the single source of truth. All scripts dot-source it — no script carries its own hardcoded repo list.
+- **No silent tool failures.** Every script calls `Assert-Environment` from `common.ps1` before doing real work. Missing tools, missing git identity, or unauthenticated `gh` all throw immediately with a clear message.
+- **Deterministic issue publishing.** Local issue files carry their own frontmatter (repo, title, labels). `publish-issue.ps1` reads it directly — no manual parameter entry, no copy-paste into the GitHub UI.
+
+Anything outside these guarantees requires discipline rather than enforcement. Use `verify-system.ps1` at the start of any session to confirm the full environment is clean before proceeding.
+
+---
+
 ## Prerequisites
 
 Before using any script, confirm the following are installed and working on your Windows PC.
@@ -82,7 +96,24 @@ cd C:\repos\tools
 
 This is safe to run again at any time — it skips repos that already exist locally.
 
-### 3. (Optional) Add tools to your PowerShell PATH
+### 3. Unblock downloaded scripts
+
+Windows marks files downloaded from the internet as untrusted and blocks them from running regardless of execution policy. Unblock all scripts in the tools repo with one command:
+
+```powershell
+cd C:\repos\tools
+Get-ChildItem *.ps1 | Unblock-File
+```
+
+Run this again any time you download new or updated `.ps1` files into the repo. No output means success.
+
+Also set the PowerShell execution policy to allow local scripts if you haven't already:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+### 4. (Optional) Add tools to your PowerShell PATH
 
 To run the scripts from any directory without typing the full path:
 
@@ -96,7 +127,7 @@ notepad $PROFILE
 # $env:PATH += ";C:\repos\tools"
 ```
 
-### 4. Install pre-commit hooks (optional but recommended)
+### 5. Install pre-commit hooks (optional but recommended)
 
 ```powershell
 cd C:\repos\tools
@@ -119,6 +150,48 @@ git commit -m "chore: update pre-commit hook versions"
 ---
 
 ## Scripts
+
+### `common.ps1`
+Shared environment validation. **Never run directly** — dot-sourced automatically by every script. Defines `Assert-Environment`, which checks for required tools and git identity before any script does real work.
+
+```powershell
+# Used inside scripts — not for direct invocation:
+. "$PSScriptRoot\common.ps1"
+Assert-Environment                          # git + git identity only
+Assert-Environment -RequireGh               # + gh CLI authenticated
+Assert-Environment -RequirePython           # + python
+Assert-Environment -RequireGh -RequirePython  # all three
+```
+
+Each script calls the appropriate variant. If git identity is not configured, any script that touches git will throw immediately with the exact commands to fix it.
+
+---
+
+### `verify-system.ps1`
+Full environment health check. Run at the start of any session to confirm the system is in a known-good state before doing real work. Exits 1 if any check fails.
+
+```powershell
+.\verify-system.ps1
+```
+
+Checks performed:
+
+| Check | Pass condition |
+|---|---|
+| git installed | `git --version` succeeds |
+| git identity | `user.name` and `user.email` configured |
+| gh installed | `gh --version` succeeds |
+| gh authenticated | `gh auth status` exits 0 |
+| python installed | `python --version` succeeds |
+| All repos cloned | `.git` present in each repo directory |
+| All repos on main | No repo on a non-main branch |
+| All working trees clean | No uncommitted or unpushed changes |
+| HA Samba share reachable | `\\homeassistant\config\scripts` accessible |
+| Last deploy timestamp | Read from `DEPLOY_VERSION.txt` on HA share |
+
+Output is color-coded: green for pass, yellow for warnings (session can proceed), red for failures (resolve before continuing).
+
+---
 
 ### `repos.ps1`
 Single source of truth for the managed repo list. **Not run directly** — dot-sourced by every other script. To add a repo to the toolkit, add one line here; no other script needs to change.
@@ -439,6 +512,7 @@ For large issues (like build-out plans generated in a Claude session), copy the 
 ```powershell
 # --- Start of session ---
 cd C:\repos\tools
+.\verify-system.ps1           # full health check — resolve any failures before continuing
 .\pull-all-repos.ps1          # sync everything from GitHub
 .\status-all-repos.ps1        # confirm clean state before starting
 
@@ -599,11 +673,14 @@ C:\repos\
 ├── tools\                          ← this repo
 │   ├── README.md
 │   ├── repos.ps1                   ← single source of truth for repo list
+│   ├── common.ps1                  ← shared Assert-Environment, dot-sourced by all scripts
 │   ├── .pre-commit-config.yaml
+│   ├── verify-system.ps1
 │   ├── clone-all-repos.ps1
 │   ├── pull-all-repos.ps1
 │   ├── push-all-repos.ps1
 │   ├── status-all-repos.ps1
+│   ├── sync-notes.ps1
 │   ├── deploy-to-ha.ps1
 │   ├── install-precommit-all.ps1
 │   ├── create-release.ps1
@@ -613,10 +690,8 @@ C:\repos\
 │   ├── list-issues.ps1
 │   ├── validate-all.ps1
 │   ├── monthly-update.ps1
-│   ├── sync-notes.ps1
 │   └── issues\                     ← local issue drafts
 │       ├── TEMPLATE.md
-│       ├── ha-config_cooling-buildout.md
 │       └── ...
 ├── home-assistant-config\
 ├── Residential-HVAC-Performance-Baseline-\
@@ -632,6 +707,22 @@ C:\repos\
 ---
 
 ## Troubleshooting
+
+**Any script throws "Git identity not configured"**
+`Assert-Environment` in `common.ps1` checks `git config user.name` and `user.email` before proceeding. Fix with:
+```powershell
+git config --global user.name "Bill Collis"
+git config --global user.email "your@email.com"
+```
+
+**Any script throws "gh CLI is not authenticated"**
+Run `gh auth login` and complete the browser flow. `Assert-Environment -RequireGh` verifies authentication, not just installation.
+
+**`verify-system.ps1` shows FAIL for HA share**
+The Samba share is not mounted. Open File Explorer, navigate to `\\homeassistant\config`, enter HA credentials. Re-run after connecting.
+
+**`verify-system.ps1` shows WARN for unpushed commits**
+Not a blocker — the session can proceed. Push when the session is complete with `.\push-all-repos.ps1`.
 
 **`deploy-to-ha.ps1` aborts with "missing source file"**
 The script now hard-aborts before touching the share if any source file is missing. Confirm the script is committed and pulled: `.\pull-all-repos.ps1`, then retry.

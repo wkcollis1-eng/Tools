@@ -9,6 +9,9 @@
 #
 # After running: Developer Tools → YAML → Reload Shell Commands
 
+. "$PSScriptRoot\common.ps1"
+Assert-Environment
+
 $deployMap = @{
     "C:\repos\home-assistant-config\scripts\climate_norms_today.py" = "\\homeassistant\config\scripts\climate_norms_today.py"
     "C:\repos\home-assistant-config\scripts\csv_manager.py"         = "\\homeassistant\config\scripts\csv_manager.py"
@@ -68,6 +71,11 @@ if ($failed -gt 0) {
     Write-Host "Deploy completed with $failed failure(s). DO NOT reload HA until resolved." -ForegroundColor Red
     exit 1
 } else {
-    Write-Host "$deployed script(s) deployed successfully." -ForegroundColor Cyan
+    # Write deploy timestamp to HA share for audit trail
+    $version = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " | $deployed script(s)"
+    Set-Content "\\homeassistant\config\scripts\DEPLOY_VERSION.txt" $version -ErrorAction SilentlyContinue
+
+    Write-Host "$deployed script(s) deployed and verified." -ForegroundColor Cyan
+    Write-Host "Deploy version: $version" -ForegroundColor DarkGray
     Write-Host "Next: Developer Tools → YAML → Reload Shell Commands" -ForegroundColor Yellow
 }
