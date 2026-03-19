@@ -15,9 +15,7 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 
 ```powershell
 cd C:\repos\Tools
-.\verify-system.ps1      # confirm environment is clean
-.\pull-all-repos.ps1     # sync all repos from GitHub
-.\status-all-repos.ps1   # review state before starting
+.\session-start.ps1   # verify, pull, status — all in one
 ```
 
 If `verify-system.ps1` exits with failures, resolve them before proceeding. Warnings (unpushed commits, non-main branch) are informational — the session can continue.
@@ -106,7 +104,23 @@ Should return `True`. If not, open File Explorer → Map Network Drive and map `
 
 ## One-time setup
 
-### 1. Create the tools repo on GitHub
+### 1. Run bootstrap.ps1 (new machine setup)
+
+On a fresh Windows machine, download `bootstrap.ps1` from the repo and run it. It handles everything in steps 2–5 automatically:
+
+```powershell
+# After installing git, python, and gh (see Prerequisites):
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+cd C:\Users\billn\OneDrive\Desktop\files
+Unblock-File .\bootstrap.ps1
+.\bootstrap.ps1
+```
+
+Bootstrap handles: gh authentication, git identity, execution policy, cloning all repos, unblocking scripts, and installing pre-commit hooks. Skip to Step 6 if bootstrap completed successfully.
+
+---
+
+### 2. Create the tools repo on GitHub (first time only)
 
 Go to https://github.com/new and create a repo named `tools` under `wkcollis1-eng`. Add a README. Public or private — your choice.
 
@@ -196,6 +210,94 @@ Assert-Environment -RequireGh -RequirePython  # all three
 ```
 
 Each script calls the appropriate variant. If git identity is not configured, any script that touches git will throw immediately with the exact commands to fix it.
+
+---
+
+### `session-start.ps1`
+Single command to begin any work session. Runs `verify-system.ps1`, `pull-all-repos.ps1`, and `status-all-repos.ps1` in sequence. Aborts on any hard failure — if the environment is not clean, the session does not start.
+
+```powershell
+.\session-start.ps1
+```
+
+---
+
+### `session-end.ps1`
+Single command to close any work session. Shows repo status, prompts for HA deploy if needed (auto-detects `.py` changes in `home-assistant-config`), pushes all repos, and syncs notes.
+
+```powershell
+.\session-end.ps1              # prompts whether to deploy
+.\session-end.ps1 -Deploy      # always deploy (skips prompt)
+.\session-end.ps1 -NoDeploy    # skip deploy entirely
+.\session-end.ps1 -NoSync      # skip sync-notes
+```
+
+**Parameters:**
+
+| Parameter | Description |
+|---|---|
+| `-Deploy` | Always run `deploy-to-ha.ps1` without prompting |
+| `-NoDeploy` | Skip deploy step entirely |
+| `-NoSync` | Skip `sync-notes.ps1` (no doc changes this session) |
+
+The deploy prompt is context-aware: if `session-end.ps1` detects `.py` file changes in `home-assistant-config` since the last commit, it defaults to **Y**. Otherwise it defaults to **N**. Pass `-Deploy` or `-NoDeploy` to skip the prompt entirely.
+
+If deploy fails, the session end aborts before pushing — preventing a push that references scripts not yet deployed to HA.
+
+---
+
+### `publish-and-sync.ps1`
+Full issue publishing workflow in one command: checks for GitHub duplicates, publishes the issue, then commits the updated file (with `published_url` written back) to the tools repo.
+
+```powershell
+.\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md
+.\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md -OpenInBrowser
+.\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md -SkipDuplicateCheck
+```
+
+**Parameters:**
+
+| Parameter | Description |
+|---|---|
+| `-OpenInBrowser` | Open the new issue URL in your browser after publishing |
+| `-SkipDuplicateCheck` | Skip the `list-issues.ps1 -Remote` step |
+
+Replaces the three-step manual sequence: `list-issues.ps1 -All`, `publish-issue.ps1`, `sync-notes.ps1`.
+
+---
+
+### `release.ps1`
+Creates a tagged GitHub release with an automatic validation gate for the HVAC baseline repo. For `Residential-HVAC-Performance-Baseline-`, runs `validate-all.ps1` before tagging — a HALT stops the release. For all other repos, tags immediately.
+
+```powershell
+.\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026 — cooling build-out"
+.\release.ps1 -Repo Residential-HVAC-Performance-Baseline- -Tag v2026.03.1 -Title "March 2026" -Month 2026-03
+.\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026" -Draft
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Repo` | Yes | Repo name |
+| `-Tag` | Yes | CalVer tag, e.g. `v2026.03.1` |
+| `-Title` | Yes | Release title |
+| `-Month` | HVAC repo | Month to validate, e.g. `2026-03`. Required for HVAC repo to scope validation |
+| `-Draft` | No | Create as draft for review before publishing |
+| `-SkipValidation` | No | Skip validation even for HVAC repo (use with caution) |
+
+---
+
+### `bootstrap.ps1`
+Full first-time setup from a fresh Windows machine. Checks prerequisites, authenticates gh, configures git identity, sets execution policy, clones all repos, unblocks scripts, and installs pre-commit hooks.
+
+```powershell
+# On a fresh machine after installing git, python, and gh:
+Unblock-File .\bootstrap.ps1
+.\bootstrap.ps1
+```
+
+This is the only script that can be run before the toolkit is set up — it has no dependency on `common.ps1` or `repos.ps1` being present. After it completes, run `verify-system.ps1` to confirm everything is clean.
 
 ---
 
@@ -525,6 +627,10 @@ Phase 2 is smart about releases — it checks `git rev-list` for each repo and o
 Local issue files let you draft, review, and version-control issues before they hit GitHub — useful for large build-out plans like the cooling infrastructure issue.
 
 ```powershell
+# Shortcut — full publish workflow in one command:
+.\publish-and-sync.ps1 issues\ha-config_filter-runtime-fix.md -OpenInBrowser
+
+# Or step by step:
 # 1. Create a new local issue file
 .\new-issue.ps1 -Repo home-assistant-config -Slug "filter-runtime-fix" -Open
 
@@ -550,20 +656,24 @@ For large issues (like build-out plans generated in a Claude session), copy the 
 ## Daily workflow
 
 ```powershell
-# --- Start of session ---
 cd C:\repos\Tools
-.\verify-system.ps1           # full health check — resolve any failures before continuing
-.\pull-all-repos.ps1          # sync everything from GitHub
-.\status-all-repos.ps1        # confirm clean state before starting
+.\session-start.ps1    # verify environment, pull, status — aborts on failure
+# ... do your Claude Code session ...
+.\session-end.ps1      # status, deploy prompt, push, sync
+```
 
-# --- Do your Claude Code session ---
-# (Claude Code commits per-repo as it works)
+That's it. The scripts encode the full workflow — nothing to remember.
 
-# --- End of session ---
-.\status-all-repos.ps1        # confirm what's staged/committed
-.\deploy-to-ha.ps1            # ONLY if a script file changed
-.\push-all-repos.ps1          # push all repos to GitHub
-.\sync-notes.ps1              # push any README or issue draft updates in tools
+For sessions where you know you won't be deploying scripts:
+
+```powershell
+.\session-end.ps1 -NoDeploy
+```
+
+For sessions with only code changes and no doc updates:
+
+```powershell
+.\session-end.ps1 -NoSync
 ```
 
 ---
@@ -715,6 +825,11 @@ C:\repos\
 │   ├── repos.ps1                   ← single source of truth for repo list
 │   ├── common.ps1                  ← shared Assert-Environment, dot-sourced by all scripts
 │   ├── .pre-commit-config.yaml
+│   ├── bootstrap.ps1
+│   ├── session-start.ps1
+│   ├── session-end.ps1
+│   ├── publish-and-sync.ps1
+│   ├── release.ps1
 │   ├── verify-system.ps1
 │   ├── clone-all-repos.ps1
 │   ├── pull-all-repos.ps1
@@ -747,6 +862,24 @@ C:\repos\
 ---
 
 ## Troubleshooting
+
+**`bootstrap.ps1` fails at a prerequisite check**
+Install the missing tool (git, python, or gh — links are printed), then re-run `bootstrap.ps1`. It is safe to re-run — completed steps are skipped.
+
+**`release.ps1` fails with HALT on HVAC repo**
+`validate-all.ps1` found a data integrity error for the target month. Fix the CSV data, commit the fix, and re-run `release.ps1`. Do not use `-SkipValidation` to bypass a legitimate data error.
+
+**`publish-and-sync.ps1` shows duplicates but I want to publish anyway**
+Answer `n` at the duplicate prompt to cancel, or pass `-SkipDuplicateCheck` to bypass it. Note that if you publish a duplicate, `publish-issue.ps1` will still succeed — it's your responsibility to close the duplicate on GitHub afterward.
+
+**`session-start.ps1` aborts at environment check**
+`verify-system.ps1` found a hard failure — the output above it will show exactly which check failed. Resolve it (missing tool, git identity, unauthenticated gh, diverged repo) and re-run `session-start.ps1`.
+
+**`session-end.ps1` aborts at deploy step**
+`deploy-to-ha.ps1` failed — hash mismatch or Samba share unreachable. Do not push until resolved. Fix the deploy issue and re-run `session-end.ps1 -Deploy` to resume from the deploy step.
+
+**`session-end.ps1` deploy prompt always shows N default but I changed a .py file**
+The auto-detect looks at `git diff HEAD~1 HEAD` — if the `.py` change hasn't been committed yet it won't be detected. Commit first, then run `session-end.ps1` or pass `-Deploy` to skip detection.
 
 **Any script throws "Git identity not configured"**
 `Assert-Environment` in `common.ps1` checks `git config user.name` and `user.email` before proceeding. Fix with:
