@@ -1,0 +1,110 @@
+# C:\repos\tools\publish-issue.ps1
+# Reads repo, title, and labels from a local issue file's YAML frontmatter
+# and creates the GitHub issue via gh CLI.
+#
+# Usage:
+#   .\publish-issue.ps1 issues\ha-config_cooling-buildout.md
+#   .\publish-issue.ps1 issues\ha-config_cooling-buildout.md -OpenInBrowser
+
+param(
+    [Parameter(Mandatory)][string]$File,
+    [switch]$OpenInBrowser
+)
+
+if (!(Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI is not installed or not on PATH. See https://cli.github.com" }
+
+. "$PSScriptRoot\repos.ps1"
+
+# Resolve relative path from tools root
+if (![System.IO.Path]::IsPathRooted($File)) {
+    $File = Join-Path $PSScriptRoot $File
+}
+
+if (!(Test-Path $File)) {
+    Write-Host "File not found: $File" -ForegroundColor Red
+    exit 1
+}
+
+# ── Parse YAML frontmatter ─────────────────────────────────────────────────────
+# Frontmatter is between the first two --- lines
+$raw   = Get-Content $File -Raw
+$lines = Get-Content $File
+
+$inFrontmatter = $false
+$frontmatter   = @{}
+$bodyStartLine = 0
+
+for ($i = 0; $i -lt $lines.Count; $i++) {
+    $line = $lines[$i].Trim()
+    if ($i -eq 0 -and $line -eq '---') {
+        $inFrontmatter = $true
+        continue
+    }
+    if ($inFrontmatter -and $line -eq '---') {
+        $bodyStartLine = $i + 1
+        break
+    }
+    if ($inFrontmatter -and $line -match '^(\w+):\s*"?(.+?)"?\s*$') {
+        $frontmatter[$Matches[1]] = $Matches[2]
+    }
+}
+
+# ── Validate required fields ───────────────────────────────────────────────────
+$repo   = $frontmatter['repo']
+$title  = $frontmatter['title']
+$labels = $frontmatter['labels']
+
+if (!$repo -or !$title) {
+    Write-Host "Frontmatter missing 'repo' or 'title' in: $File" -ForegroundColor Red
+    Write-Host "Expected format at top of file:" -ForegroundColor Yellow
+    Write-Host "  ---"
+    Write-Host "  repo: home-assistant-config"
+    Write-Host "  title: `"Your issue title`""
+    Write-Host "  labels: enhancement"
+    Write-Host "  ---"
+    exit 1
+}
+
+if ($repo -notin $Repos) {
+    Write-Host "Unknown repo '$repo' in frontmatter. Valid options:" -ForegroundColor Red
+    $Repos | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# ── Extract body (everything after frontmatter) ────────────────────────────────
+$body = ($lines[$bodyStartLine..($lines.Count - 1)] | Out-String).Trim()
+
+if (!$body -or $body -match '<!--') {
+    Write-Host "Issue body appears to still contain template placeholders." -ForegroundColor Yellow
+    $confirm = Read-Host "Publish anyway? (y/N)"
+    if ($confirm -notmatch '^[Yy]$') { exit 0 }
+}
+
+# ── Build gh command ───────────────────────────────────────────────────────────
+$ghArgs = @(
+    "issue", "create",
+    "--repo",  "wkcollis1-eng/$repo",
+    "--title", $title,
+    "--body",  $body
+)
+
+if ($labels) {
+    $ghArgs += @("--label", $labels)
+}
+
+Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green
+Write-Host "  Title: $title" -ForegroundColor Cyan
+if ($labels) { Write-Host "  Labels: $labels" -ForegroundColor Cyan }
+
+$issueUrl = & gh @ghArgs
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "gh issue create failed." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Created: $issueUrl" -ForegroundColor Green
+
+if ($OpenInBrowser) {
+    Start-Process $issueUrl
+}

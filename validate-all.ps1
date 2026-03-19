@@ -14,7 +14,8 @@ param(
 
 if (!(Get-Command python -ErrorAction SilentlyContinue)) { throw "python is not installed or not on PATH." }
 
-$repoPath  = "C:\repos\Residential-HVAC-Performance-Baseline-"
+. "$PSScriptRoot\repos.ps1"
+$repoPath  = "$ReposRoot\Residential-HVAC-Performance-Baseline-"
 $scriptPath = "$repoPath\Scripts\validate_month.py"
 
 if (-not (Test-Path $scriptPath)) {
@@ -49,7 +50,7 @@ if ($monthArg -ne "") {
 }
 
 $exitCode = $LASTEXITCODE
-Set-Location C:\repos\tools
+Set-Location "$ReposRoot\tools"
 
 if ($exitCode -ne 0) {
     Write-Host ""

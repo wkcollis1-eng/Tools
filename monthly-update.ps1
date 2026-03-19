@@ -144,7 +144,7 @@ if ($Phase -eq "2") {
         if ($DraftRelease) { $releaseArgs += "--draft" }
 
         foreach ($repo in $releaseRepos) {
-            $repoPath = "C:\repos\$repo"
+            $repoPath = "$ReposRoot\$repo"
             if (-not (Test-Path "$repoPath\.git")) {
                 Write-Host "Skipping $repo (not cloned locally)" -ForegroundColor Yellow
                 continue
@@ -163,7 +163,7 @@ if ($Phase -eq "2") {
                 Write-Host "  Skipping $repo (no new commits since $lastTag)" -ForegroundColor Yellow
             }
         }
-        Set-Location C:\repos\tools
+        Set-Location "$ReposRoot\tools"
     }
 
     Step "Pushing all repos"

@@ -237,6 +237,74 @@ Hooks included:
 
 ---
 
+### `new-issue.ps1`
+Creates a new local issue file in `tools\issues\` from the standard template. The filename is derived from the repo and a slug you provide. Edit the file, then publish it with `publish-issue.ps1`.
+
+```powershell
+.\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout"
+.\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout" -Open   # opens in Notepad immediately
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Repo` | Yes | Exact repo name |
+| `-Slug` | Yes | Short kebab-case description, e.g. `cooling-buildout`. Becomes part of the filename |
+| `-Open` | No | Switch. Opens the new file in Notepad immediately |
+
+Creates: `issues\ha-config_cooling-buildout.md` (repo prefix is derived automatically).
+
+---
+
+### `publish-issue.ps1`
+Reads the YAML frontmatter from a local issue file and creates the GitHub issue via `gh`. No parameters to remember — everything is in the file.
+
+```powershell
+.\publish-issue.ps1 issues\ha-config_cooling-buildout.md
+.\publish-issue.ps1 issues\ha-config_cooling-buildout.md -OpenInBrowser
+```
+
+**Frontmatter format** (required at the top of every issue file):
+```yaml
+---
+repo: home-assistant-config
+title: "feat: AC cooling build-out"
+labels: enhancement,hvac
+---
+```
+
+The script validates that `repo` and `title` are present, warns if the body still contains template placeholder comments, and aborts if the repo name is not in `repos.ps1`.
+
+---
+
+### `list-issues.ps1`
+Lists local issue drafts and/or open GitHub issues across all managed repos. Useful for reviewing what's queued locally before publishing, and for checking GitHub for duplicates.
+
+```powershell
+.\list-issues.ps1                                        # local drafts only
+.\list-issues.ps1 -Remote                                # GitHub open issues, all repos
+.\list-issues.ps1 -Remote -Repo home-assistant-config   # one repo only
+.\list-issues.ps1 -All                                   # local drafts + GitHub issues side by side
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Repo` | No | Filter to a single repo. Works with all modes |
+| `-Remote` | No | Switch. Fetch and display open issues from GitHub via `gh` |
+| `-All` | No | Switch. Show both local drafts and GitHub issues |
+
+Remote mode requires `gh` authenticated. Color-coded by repo — same scheme as `status-all-repos.ps1`.
+
+---
+
+### `issues\TEMPLATE.md`
+Standard template for new issue files. Copied automatically by `new-issue.ps1` — do not edit directly. Contains frontmatter fields and section headers that match the project's issue style.
+
+---
+
 ### `create-issue.ps1`
 Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisites).
 
@@ -318,6 +386,33 @@ Validates the newly entered month, tags releases for repos with new commits, and
 | `-DraftRelease` | No | Switch. Create releases as drafts for review before publishing |
 
 Phase 2 is smart about releases — it checks `git rev-list` for each repo and only tags repos that have new commits since their last tag. Repos with no changes are skipped automatically.
+
+---
+
+## Issue workflow
+
+Local issue files let you draft, review, and version-control issues before they hit GitHub — useful for large build-out plans like the cooling infrastructure issue.
+
+```powershell
+# 1. Create a new local issue file
+.\new-issue.ps1 -Repo home-assistant-config -Slug "filter-runtime-fix" -Open
+
+# 2. Edit the file in tools\issues\ha-config_filter-runtime-fix.md
+#    Fill in the title, body sections, and labels in the frontmatter
+
+# 3. Check for duplicates before publishing
+.\list-issues.ps1 -All -Repo home-assistant-config
+
+# 4. Publish to GitHub when ready
+.\publish-issue.ps1 issues\ha-config_filter-runtime-fix.md -OpenInBrowser
+
+# 5. Commit the issue file to the tools repo for reference
+git add issues\
+git commit -m "docs: add filter runtime fix issue draft"
+git push
+```
+
+For large issues (like build-out plans generated in a Claude session), copy the markdown body into a new issue file and set the frontmatter — then `publish-issue.ps1` handles the rest with no copy-paste into the GitHub UI.
 
 ---
 
@@ -494,8 +589,15 @@ C:\repos\
 │   ├── install-precommit-all.ps1
 │   ├── create-release.ps1
 │   ├── create-issue.ps1
+│   ├── new-issue.ps1
+│   ├── publish-issue.ps1
+│   ├── list-issues.ps1
 │   ├── validate-all.ps1
-│   └── monthly-update.ps1
+│   ├── monthly-update.ps1
+│   └── issues\                     ← local issue drafts
+│       ├── TEMPLATE.md
+│       ├── ha-config_cooling-buildout.md
+│       └── ...
 ├── home-assistant-config\
 ├── Residential-HVAC-Performance-Baseline-\
 │   ├── .claude\
@@ -543,6 +645,12 @@ One or more months have data integrity issues — the output will identify which
 
 **`monthly-update.ps1` stops at Phase 2 before pushing**
 Validation failed with a HALT. Fix the data error in the relevant CSV, commit the fix, then re-run `.\monthly-update.ps1 -Month YYYY-MM -Phase 2 -Tag vYYYY.MM.N`.
+
+**`publish-issue.ps1` fails with "Frontmatter missing repo or title"**
+The file is missing the `---` frontmatter block or the fields are malformed. Open the file and confirm the top looks exactly like the template — `---` on its own line, then `repo:`, `title:`, `labels:`, then `---` again.
+
+**`publish-issue.ps1` warns about template placeholders**
+The body still contains `<!--` comment text from the template. Either fill in the sections or answer `y` at the prompt to publish anyway (useful for minimal issues).
 
 **`create-issue.ps1` fails silently or creates an empty issue**
 If neither `-Body` nor `-BodyFile` is provided and no editor is configured, `gh` may create an issue with an empty body. Set a default editor: `gh config set editor notepad` and re-run.
