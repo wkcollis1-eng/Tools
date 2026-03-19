@@ -191,6 +191,24 @@ Runs `git push` in every repo. Warns if any repo is not on `main`. Reports unpus
 
 ---
 
+### `sync-notes.ps1`
+Stages, commits, and pushes any text or doc changes in the `tools` repo in one command. Use this for README updates, issue drafts, and any non-code changes. Does nothing if the working tree is already clean.
+
+```powershell
+.\sync-notes.ps1                                              # default commit message
+.\sync-notes.ps1 -Message "docs: add cooling buildout draft" # custom message
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `-Message` | No | Commit message. Defaults to `"docs: update notes and issue files"` |
+
+> Note: this only syncs the `tools` repo (README, issue drafts, scripts). For changes across all repos use `push-all-repos.ps1`.
+
+---
+
 ### `create-release.ps1`
 Creates a tagged GitHub release using the `gh` CLI. Requires `gh` to be installed and authenticated (see Prerequisites).
 
@@ -431,6 +449,7 @@ cd C:\repos\tools
 .\status-all-repos.ps1        # confirm what's staged/committed
 .\deploy-to-ha.ps1            # ONLY if a script file changed
 .\push-all-repos.ps1          # push all repos to GitHub
+.\sync-notes.ps1              # push any README or issue draft updates in tools
 ```
 
 ---
@@ -594,6 +613,7 @@ C:\repos\
 │   ├── list-issues.ps1
 │   ├── validate-all.ps1
 │   ├── monthly-update.ps1
+│   ├── sync-notes.ps1
 │   └── issues\                     ← local issue drafts
 │       ├── TEMPLATE.md
 │       ├── ha-config_cooling-buildout.md
