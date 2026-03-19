@@ -11,6 +11,18 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 
 ---
 
+## Operational invariants
+
+These rules are non-negotiable. The scripts enforce them where possible; the rest require discipline.
+
+1. **Never commit data that fails HALT-level validation.** `validate-all.ps1` exits 1 on HALT. `monthly-update.ps1` Phase 2 aborts before pushing if validation fails.
+2. **Always run `pull-all-repos.ps1` before any session.** Working on stale local state causes merge conflicts.
+3. **Run `deploy-to-ha.ps1` after any script file change.** Six HA shell commands depend on the three deployed scripts. A missing deploy breaks them silently until the next automation fires.
+4. **`monthly-update.ps1` Phase 2 requires a clean working tree.** The script enforces this — uncommitted changes in any release repo abort the sequence.
+5. **Repo list changes go in `repos.ps1` only.** All scripts source it. Never hardcode a repo name in an individual script.
+
+---
+
 ## Prerequisites
 
 Before using any script, confirm the following are installed and working on your Windows PC.
@@ -108,8 +120,19 @@ git commit -m "chore: update pre-commit hook versions"
 
 ## Scripts
 
+### `repos.ps1`
+Single source of truth for the managed repo list. **Not run directly** — dot-sourced by every other script. To add a repo to the toolkit, add one line here; no other script needs to change.
+
+```powershell
+# repos.ps1 is sourced automatically — no manual invocation needed
+```
+
+To add a new repo: edit `$Repos` and `$RepoUrls` in `repos.ps1`, then run `clone-all-repos.ps1`.
+
+---
+
 ### `clone-all-repos.ps1`
-Clones all five repos into `C:\repos\`. Safe to re-run — skips repos that already exist.
+Clones all repos defined in `repos.ps1` into `C:\repos\`. Safe to re-run — skips repos that already exist locally.
 
 ```powershell
 .\clone-all-repos.ps1
@@ -118,7 +141,7 @@ Clones all five repos into `C:\repos\`. Safe to re-run — skips repos that alre
 ---
 
 ### `pull-all-repos.ps1`
-Runs `git pull` in every repo. **Run this at the start of every session** before opening Claude Code.
+Runs `git pull` in every repo. **Run this at the start of every session** before opening Claude Code. Warns if any repo is not on `main` (does not abort — legitimate branch work is allowed). Prints a color-coded summary on completion.
 
 ```powershell
 .\pull-all-repos.ps1
@@ -127,7 +150,7 @@ Runs `git pull` in every repo. **Run this at the start of every session** before
 ---
 
 ### `status-all-repos.ps1`
-Runs `git status --short` in every repo. Use this for a quick pre-commit sanity check.
+Shows current branch, unpushed commit count, and changed files for every repo. Run before committing or pushing.
 
 ```powershell
 .\status-all-repos.ps1
@@ -136,7 +159,7 @@ Runs `git status --short` in every repo. Use this for a quick pre-commit sanity 
 ---
 
 ### `deploy-to-ha.ps1`
-Copies live Python scripts from `home-assistant-config` to the HA Green Samba share. **Run this after any commit that modifies a script file.**
+Copies live Python scripts to the HA Green Samba share. **Run after any commit that modifies a script file.** Performs a hard pre-flight check before touching the share (aborts if any source file is missing or the share is unreachable), then verifies SHA-256 hashes after each copy to catch Samba partial writes.
 
 ```powershell
 .\deploy-to-ha.ps1
@@ -160,13 +183,11 @@ To add a new script in the future, add one line to the `$deployMap` hash table i
 ---
 
 ### `push-all-repos.ps1`
-Runs `git push` in every repo. Use at the end of a session after all commits are made.
+Runs `git push` in every repo. Warns if any repo is not on `main`. Reports unpushed commit count per repo and prints a summary. Run `status-all-repos.ps1` first to confirm what will go out.
 
 ```powershell
 .\push-all-repos.ps1
 ```
-
-> Note: this pushes whatever is committed locally. If a repo has unpushed commits on a branch other than `main`, they will also push. Run `status-all-repos.ps1` first to confirm you know what's going out.
 
 ---
 
@@ -195,7 +216,7 @@ Creates a tagged GitHub release using the `gh` CLI. Requires `gh` to be installe
 ---
 
 ### `install-precommit-all.ps1`
-Installs pre-commit hooks in all five repos. Run once after initial clone. Also installs `pre-commit` via pip if it is not already present.
+Installs pre-commit hooks in all managed repos. Run once after initial clone. Also installs `pre-commit` via pip if not present, and automatically runs `pre-commit autoupdate` in each repo so you never depend on stale pinned versions. If autoupdate modifies `.pre-commit-config.yaml`, the script prints the exact `git add` and `git commit` commands needed to save the update.
 
 ```powershell
 .\install-precommit-all.ps1
@@ -339,9 +360,106 @@ If validation fails in Phase 2 with a HALT, the script stops before tagging or p
 
 ---
 
-## Extending the deploy map
+## Claude Code hooks
 
-When a new Python script is added to `home-assistant-config\scripts\` and referenced by a shell command in `configuration.yaml`, add it to `deploy-to-ha.ps1`:
+Hooks are shell commands that Claude Code runs automatically at lifecycle events — before or after tool use, on session start/stop, etc. The most useful application for this repo is running `validate_month.py` automatically every time Claude Code writes a CSV in the `Residential-HVAC-Performance-Baseline-` data directory. This closes the loop without requiring you to remember to run validation manually.
+
+### How hooks work
+
+- **`PostToolUse`** — fires after a tool completes. Output goes back to Claude as context; exit code 1 is a non-blocking warning; exit code 0 is success.
+- **Matcher** — filters which tool triggers the hook. Uses pipe syntax: `"Write|Edit"`. Case-sensitive: `Write` and `Edit` are correct; `write` won't match.
+- **Settings file** — project-level hooks go in `.claude/settings.json` in the repo root. User-level hooks go in `~/.claude/settings.json` and apply to every project.
+
+### Setup — validation hook for Residential-HVAC-Performance-Baseline-
+
+This hook runs `validate_month.py` automatically after any write to a CSV file in the `data/` directory. It uses a thin Python wrapper to read the hook's stdin JSON, check the file path, and only run validation when a data CSV is actually being written — not on every file write in the repo.
+
+**Step 1 — Create the hook directory:**
+```powershell
+mkdir C:\repos\Residential-HVAC-Performance-Baseline-\.claude\hooks
+```
+
+**Step 2 — Create the wrapper script:**
+
+Save this as `C:\repos\Residential-HVAC-Performance-Baseline-\.claude\hooks\validate_on_csv_write.py`:
+
+```python
+#!/usr/bin/env python3
+"""
+PostToolUse hook — runs validate_month.py after any CSV write in data/.
+Reads tool event JSON from stdin (provided by Claude Code).
+Exits 0 (PASS/WARN) or 1 (HALT) to mirror validate_month.py exit codes.
+"""
+import json
+import os
+import subprocess
+import sys
+
+data = json.load(sys.stdin)
+file_path = data.get("tool_input", {}).get("file_path", "")
+
+# Only trigger for CSV files in the data directory
+if not (file_path.endswith(".csv") and "data" in file_path):
+    sys.exit(0)
+
+# Run validate_month.py from repo root
+repo_root = os.environ.get("CLAUDE_PROJECT_DIR", ".")
+result = subprocess.run(
+    [sys.executable, "Scripts/validate_month.py"],
+    cwd=repo_root
+)
+
+# Exit code propagates back to Claude Code:
+#   0 = PASS/WARN (Claude continues normally)
+#   1 = HALT (Claude sees failure output and can stop itself)
+sys.exit(result.returncode)
+```
+
+**Step 3 — Create the settings file:**
+
+Save this as `C:\repos\Residential-HVAC-Performance-Baseline-\.claude\settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/validate_on_csv_write.py"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Step 4 — Commit both files:**
+```powershell
+cd C:\repos\Residential-HVAC-Performance-Baseline-
+git add .claude/
+git commit -m "chore: add PostToolUse validation hook for data CSV writes"
+```
+
+### What this does in practice
+
+During a monthly update Claude Code session, every time Claude writes or edits a file in `data/`, the hook fires. If the file isn't a CSV, the wrapper exits 0 immediately (no overhead). If it is a CSV, `validate_month.py` runs and its full output — `✅ PASS`, `⚠️ WARN`, `🚩 FLAG`, or `🛑 HALT` — appears in the Claude Code session. On a HALT, Claude sees the failure before it moves to the next step, giving it the opportunity to stop and report the issue rather than continuing with bad data.
+
+This means `validate-all.ps1` is still useful for a deliberate pre-push check, but you no longer need to remember to run it during the session — validation is automatic.
+
+### Updating hooks after a pre-commit autoupdate
+
+The `.claude/settings.json` file is independent of `.pre-commit-config.yaml` and does not need updating when you run `pre-commit autoupdate`. They are separate systems.
+
+---
+
+## Extending the toolkit
+
+### Adding a new Python script to deploy
+When a new `.py` script is added to `home-assistant-config\scripts\` and referenced by a shell command in `configuration.yaml`, add one entry to the `$deployMap` in `deploy-to-ha.ps1`:
 
 ```powershell
 $deployMap = @{
@@ -353,7 +471,10 @@ $deployMap = @{
 }
 ```
 
-No other changes are needed. The script loops the map automatically.
+No other changes are needed.
+
+### Adding a new repo to the toolkit
+Edit `repos.ps1` — add the repo name to `$Repos` and its clone URL to `$RepoUrls`. Every script that dot-sources `repos.ps1` will automatically include it. Then run `.\clone-all-repos.ps1` to pull it locally.
 
 ---
 
@@ -363,6 +484,7 @@ No other changes are needed. The script loops the map automatically.
 C:\repos\
 ├── tools\                          ← this repo
 │   ├── README.md
+│   ├── repos.ps1                   ← single source of truth for repo list
 │   ├── .pre-commit-config.yaml
 │   ├── clone-all-repos.ps1
 │   ├── pull-all-repos.ps1
@@ -376,6 +498,11 @@ C:\repos\
 │   └── monthly-update.ps1
 ├── home-assistant-config\
 ├── Residential-HVAC-Performance-Baseline-\
+│   ├── .claude\
+│   │   ├── settings.json           ← PostToolUse validation hook config
+│   │   └── hooks\
+│   │       └── validate_on_csv_write.py
+│   └── ...
 ├── Lifepo4-Battery-Banks\
 └── DIY-LiFePO4-UPS\
 ```
@@ -384,11 +511,20 @@ C:\repos\
 
 ## Troubleshooting
 
-**`deploy-to-ha.ps1` reports "Missing" for a script**
-The local file path in `$deployMap` does not exist. Confirm the script is committed and pulled to `C:\repos\home-assistant-config\scripts\`.
+**`deploy-to-ha.ps1` aborts with "missing source file"**
+The script now hard-aborts before touching the share if any source file is missing. Confirm the script is committed and pulled: `.\pull-all-repos.ps1`, then retry.
 
-**`deploy-to-ha.ps1` fails to copy (access denied or path not found)**
-The Samba share is not mounted. Open File Explorer and navigate to `\\homeassistant\config` — you may need to enter HA credentials. Once connected, re-run the script.
+**`deploy-to-ha.ps1` aborts with "Samba share not accessible"**
+The share is not mounted. Open File Explorer, navigate to `\\homeassistant\config`, and enter HA credentials when prompted. Once connected, re-run the script.
+
+**`deploy-to-ha.ps1` reports "HASH MISMATCH"**
+The file copied to the share does not match the source — likely a Samba partial write. Re-run `deploy-to-ha.ps1` immediately. Do not reload HA shell commands until the script reports all hashes verified.
+
+**`pull-all-repos.ps1` or `push-all-repos.ps1` warns about a non-main branch**
+This is a warning, not an error — the script continues. If the branch is unintentional, `cd C:\repos\<repo>` and `git checkout main` before proceeding. If it is intentional, the warning can be ignored.
+
+**`monthly-update.ps1` Phase 2 aborts with "Uncommitted changes"**
+The clean working tree guard fired. Commit or stash the changes in the flagged repo, then re-run Phase 2.
 
 **`pre-commit` blocks a commit with a YAML error**
 Fix the YAML in the flagged file, then `git add` the file again and retry the commit. The hook output will show the exact line number.
@@ -410,6 +546,12 @@ Validation failed with a HALT. Fix the data error in the relevant CSV, commit th
 
 **`create-issue.ps1` fails silently or creates an empty issue**
 If neither `-Body` nor `-BodyFile` is provided and no editor is configured, `gh` may create an issue with an empty body. Set a default editor: `gh config set editor notepad` and re-run.
+
+**Hook doesn't fire when Claude Code writes a CSV**
+Confirm `.claude/settings.json` is in the repo root (not a subdirectory). Confirm the matcher is `"Write|Edit"` with exact casing. Confirm `python` is on your PATH (`python --version` in PowerShell). If Claude Code is writing via `Bash` rather than the `Write` tool, add `Bash` to the matcher: `"Write|Edit|Bash"`.
+
+**Hook fires but validate_month.py output doesn't appear in the session**
+The hook command must write to stdout for Claude Code to capture it. `validate_month.py` uses `print()` which goes to stdout — this is correct. If output is missing, the hook may be exiting before the script runs. Add a `print(f"Hook triggered for: {file_path}")` at the top of the wrapper script temporarily to confirm it's being called.
 
 **`git pull` reports merge conflicts**
 Do not force-push. Resolve conflicts manually in the affected file, then `git add` and `git commit`. If Claude Code made the conflicting commit, check CLAUDE.md for the session rules that govern how it handles existing content.
