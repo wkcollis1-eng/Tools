@@ -1,4 +1,4 @@
-# C:\repos\tools\validate-all.ps1
+# C:\repos\Tools\validate-all.ps1
 # Runs validate_month.py against the Residential-HVAC-Performance-Baseline- repo.
 # Validates all months by default, or a specific month with -Month.
 # Exits 1 if any HALT-level check fails — safe to use as a pre-commit gate.
@@ -12,7 +12,10 @@ param(
     [string]$Month = ""
 )
 
-if (!(Get-Command python -ErrorAction SilentlyContinue)) { throw "python is not installed or not on PATH." }
+
+
+. "$PSScriptRoot\common.ps1"
+Assert-Environment -RequirePython
 
 . "$PSScriptRoot\repos.ps1"
 $repoPath  = "$ReposRoot\Residential-HVAC-Performance-Baseline-"
@@ -50,7 +53,7 @@ if ($monthArg -ne "") {
 }
 
 $exitCode = $LASTEXITCODE
-Set-Location "$ReposRoot\tools"
+Set-Location $PSScriptRoot
 
 if ($exitCode -ne 0) {
     Write-Host ""

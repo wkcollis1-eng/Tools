@@ -14,7 +14,7 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 ## Quick start
 
 ```powershell
-cd C:\repos\tools
+cd C:\repos\Tools
 .\verify-system.ps1      # confirm environment is clean
 .\pull-all-repos.ps1     # sync all repos from GitHub
 .\status-all-repos.ps1   # review state before starting
@@ -122,7 +122,7 @@ git clone https://github.com/wkcollis1-eng/tools.git
 
 Then run the clone script to pull the other four repos:
 ```powershell
-cd C:\repos\tools
+cd C:\repos\Tools
 .\clone-all-repos.ps1
 ```
 
@@ -133,7 +133,7 @@ This is safe to run again at any time — it skips repos that already exist loca
 Windows marks files downloaded from the internet as untrusted and blocks them from running regardless of execution policy. Unblock all scripts in the tools repo with one command:
 
 ```powershell
-cd C:\repos\tools
+cd C:\repos\Tools
 Get-ChildItem *.ps1 | Unblock-File
 ```
 
@@ -151,18 +151,18 @@ To run the scripts from any directory without typing the full path:
 
 ```powershell
 # Add to current session only:
-$env:PATH += ";C:\repos\tools"
+$env:PATH += ";C:\repos\Tools"
 
 # To make permanent, add to your PowerShell profile:
 notepad $PROFILE
 # Add this line at the bottom:
-# $env:PATH += ";C:\repos\tools"
+# $env:PATH += ";C:\repos\Tools"
 ```
 
 ### 5. Install pre-commit hooks (optional but recommended)
 
 ```powershell
-cd C:\repos\tools
+cd C:\repos\Tools
 .\install-precommit-all.ps1
 ```
 
@@ -442,7 +442,7 @@ Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisit
 ```powershell
 .\create-issue.ps1 -Repo home-assistant-config -Title "Fix DST in climate_norms_today.py"
 .\create-issue.ps1 -Repo Residential-HVAC-Performance-Baseline- -Title "Add March 2026 data" -OpenInBrowser
-.\create-issue.ps1 -Repo home-assistant-config -Title "Cooling build-out" -BodyFile "C:\repos\tools\issue_body.md"
+.\create-issue.ps1 -Repo home-assistant-config -Title "Cooling build-out" -BodyFile "C:\repos\Tools\issue_body.md"
 ```
 
 **Parameters:**
@@ -551,7 +551,7 @@ For large issues (like build-out plans generated in a Claude session), copy the 
 
 ```powershell
 # --- Start of session ---
-cd C:\repos\tools
+cd C:\repos\Tools
 .\verify-system.ps1           # full health check — resolve any failures before continuing
 .\pull-all-repos.ps1          # sync everything from GitHub
 .\status-all-repos.ps1        # confirm clean state before starting

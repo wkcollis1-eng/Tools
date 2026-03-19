@@ -1,5 +1,5 @@
 # push-tools-to-github.ps1
-# Copies tools repo files from Desktop\files to C:\repos\tools and pushes to GitHub.
+# Copies tools repo files from Desktop\files to C:\repos\Tools and pushes to GitHub.
 # Run this once from any PowerShell window.
 #
 # Usage:
@@ -7,7 +7,7 @@
 #   .\push-tools-to-github.ps1
 
 $source  = "C:\Users\billn\OneDrive\Desktop\files"
-$target  = "C:\repos\tools"
+$target  = "C:\repos\Tools"
 $repoUrl = "https://github.com/wkcollis1-eng/tools.git"
 
 # ── Pre-flight checks ──────────────────────────────────────────────────────────

@@ -1,9 +1,12 @@
-# C:\repos\tools\pull-all-repos.ps1
+# C:\repos\Tools\pull-all-repos.ps1
 # Runs git pull in every managed repo.
 # Warns (does not abort) if a repo is not on main.
 # Run this at the start of every session before opening Claude Code.
 
-if (!(Get-Command git -ErrorAction SilentlyContinue)) { throw "git is not installed or not on PATH." }
+
+
+. "$PSScriptRoot\common.ps1"
+Assert-Environment
 
 . "$PSScriptRoot\repos.ps1"
 
@@ -42,7 +45,7 @@ foreach ($repo in $Repos) {
     }
 }
 
-Set-Location "$ReposRoot\tools"
+Set-Location $PSScriptRoot
 
 # Summary
 Write-Host ""
