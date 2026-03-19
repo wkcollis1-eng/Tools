@@ -11,6 +11,19 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 
 ---
 
+## Quick start
+
+```powershell
+cd C:\repos\tools
+.\verify-system.ps1      # confirm environment is clean
+.\pull-all-repos.ps1     # sync all repos from GitHub
+.\status-all-repos.ps1   # review state before starting
+```
+
+If `verify-system.ps1` exits with failures, resolve them before proceeding. Warnings (unpushed commits, non-main branch) are informational — the session can continue.
+
+---
+
 ## Operational invariants
 
 These rules are non-negotiable. The scripts enforce them where possible; the rest require discipline.
@@ -34,6 +47,25 @@ What this toolkit actively enforces — as opposed to what it relies on discipli
 - **Deterministic issue publishing.** Local issue files carry their own frontmatter (repo, title, labels). `publish-issue.ps1` reads it directly — no manual parameter entry, no copy-paste into the GitHub UI.
 
 Anything outside these guarantees requires discipline rather than enforcement. Use `verify-system.ps1` at the start of any session to confirm the full environment is clean before proceeding.
+
+---
+
+## Failure model
+
+Defines how each type of failure is handled across all scripts. New scripts must conform to this model.
+
+| Failure type | Exit | Examples | Script behavior |
+|---|---|---|---|
+| **Hard failure** | 1 | Missing tool, git identity not set, HALT validation, deploy hash mismatch, diverged repo | Throws immediately with actionable message. No partial state left. |
+| **Soft failure** | 0 | Per-repo git failure in batch pull/push | Logged with color, script continues to remaining repos, summary shown at end. |
+| **Warning** | 0 | Non-main branch, unpushed commits, python not installed | Printed in yellow. Session may proceed. |
+
+**Rules for script authors:**
+- Hard failures use `throw` or `exit 1` — never silently continue after a hard failure.
+- Soft failures accumulate in a `$failures` or `$results` hash and are reported in the summary.
+- Warnings never block execution.
+- Multi-repo scripts always print a summary at the end regardless of individual outcomes.
+
 
 ---
 
@@ -367,6 +399,14 @@ labels: enhancement,hvac
 
 The script validates that `repo` and `title` are present, warns if the body still contains template placeholder comments, and aborts if the repo name is not in `repos.ps1`.
 
+After a successful publish, the script writes `published_url` back into the file's frontmatter:
+
+```yaml
+published_url: https://github.com/wkcollis1-eng/home-assistant-config/issues/2
+```
+
+This creates a bidirectional trace — the local file records where it was published, and re-running `publish-issue.ps1` on the same file will warn before creating a duplicate.
+
 ---
 
 ### `list-issues.ps1`
@@ -555,7 +595,7 @@ Hooks are shell commands that Claude Code runs automatically at lifecycle events
 ### How hooks work
 
 - **`PostToolUse`** — fires after a tool completes. Output goes back to Claude as context; exit code 1 is a non-blocking warning; exit code 0 is success.
-- **Matcher** — filters which tool triggers the hook. Uses pipe syntax: `"Write|Edit"`. Case-sensitive: `Write` and `Edit` are correct; `write` won't match.
+- **Matcher** — filters which tool triggers the hook. Uses pipe syntax: `"Write|Edit|MultiEdit"`. Case-sensitive: `Write` and `Edit` are correct; `write` won't match.
 - **Settings file** — project-level hooks go in `.claude/settings.json` in the repo root. User-level hooks go in `~/.claude/settings.json` and apply to every project.
 
 ### Setup — validation hook for Residential-HVAC-Performance-Baseline-
@@ -612,7 +652,7 @@ Save this as `C:\repos\Residential-HVAC-Performance-Baseline-\.claude\settings.j
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
@@ -767,7 +807,7 @@ The body still contains `<!--` comment text from the template. Either fill in th
 If neither `-Body` nor `-BodyFile` is provided and no editor is configured, `gh` may create an issue with an empty body. Set a default editor: `gh config set editor notepad` and re-run.
 
 **Hook doesn't fire when Claude Code writes a CSV**
-Confirm `.claude/settings.json` is in the repo root (not a subdirectory). Confirm the matcher is `"Write|Edit"` with exact casing. Confirm `python` is on your PATH (`python --version` in PowerShell). If Claude Code is writing via `Bash` rather than the `Write` tool, add `Bash` to the matcher: `"Write|Edit|Bash"`.
+Confirm `.claude/settings.json` is in the repo root (not a subdirectory). Confirm the matcher is `"Write|Edit|MultiEdit"` with exact casing. Confirm `python` is on your PATH (`python --version` in PowerShell). If Claude Code is writing via `Bash` rather than the `Write` tool, add `Bash` to the matcher: `"Write|Edit|MultiEdit|Bash"`.
 
 **Hook fires but validate_month.py output doesn't appear in the session**
 The hook command must write to stdout for Claude Code to capture it. `validate_month.py` uses `print()` which goes to stdout — this is correct. If output is missing, the hook may be exiting before the script runs. Add a `print(f"Hook triggered for: {file_path}")` at the top of the wrapper script temporarily to confirm it's being called.

@@ -11,7 +11,10 @@ param(
     [switch]$OpenInBrowser
 )
 
-if (!(Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI is not installed or not on PATH. See https://cli.github.com" }
+
+
+. "$PSScriptRoot\common.ps1"
+Assert-Environment -RequireGh
 
 . "$PSScriptRoot\repos.ps1"
 
@@ -47,6 +50,13 @@ for ($i = 0; $i -lt $lines.Count; $i++) {
     if ($inFrontmatter -and $line -match '^(\w+):\s*"?(.+?)"?\s*$') {
         $frontmatter[$Matches[1]] = $Matches[2]
     }
+}
+
+# ── Check if already published ────────────────────────────────────────────────
+if ($frontmatter['published_url']) {
+    Write-Host "This issue has already been published: $($frontmatter['published_url'])" -ForegroundColor Yellow
+    $confirm = Read-Host "Publish again anyway? (y/N)"
+    if ($confirm -notmatch '^[Yy]$') { exit 0 }
 }
 
 # ── Validate required fields ───────────────────────────────────────────────────
@@ -104,6 +114,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Created: $issueUrl" -ForegroundColor Green
+
+# ── Write published_url back to frontmatter ────────────────────────────────────
+# Adds published_url to the frontmatter so the file serves as an audit record
+$fileContent = Get-Content $File -Raw
+$fileContent = $fileContent -replace "(^---`n(?:.*`n)*?)---", "`$1published_url: $issueUrl`n---"
+Set-Content $File $fileContent -NoNewline
+Write-Host "Updated $File with published_url" -ForegroundColor DarkGray
 
 if ($OpenInBrowser) {
     Start-Process $issueUrl

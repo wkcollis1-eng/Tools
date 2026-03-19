@@ -2,6 +2,7 @@
 repo: home-assistant-config
 title: "Short descriptive title"
 labels: enhancement
+published_url:
 ---
 
 ## Summary

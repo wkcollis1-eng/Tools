@@ -5,7 +5,8 @@
 # Checks:
 #   - git, gh, python installed and configured
 #   - All repos cloned and on main branch
-#   - All working trees clean
+#   - All repos cloned, on main, working trees clean
+#   - Repo divergence from origin/main detected
 #   - HA Samba share reachable
 #
 # Usage:
@@ -76,19 +77,34 @@ foreach ($repo in $Repos) {
 
     Set-Location $path
 
-    $branch   = git rev-parse --abbrev-ref HEAD 2>$null
-    $dirty    = git status --porcelain 2>$null
-    $unpushed = git rev-list "@{u}..HEAD" --count 2>$null
+    $branch = git rev-parse --abbrev-ref HEAD 2>$null
+    $dirty  = git status --porcelain 2>$null
+
+    # Fetch silently so divergence counts are accurate
+    git fetch origin --quiet 2>$null
+
+    # Divergence: left=commits ahead of remote, right=commits behind remote
+    $divRaw   = git rev-list --left-right --count "origin/main...HEAD" 2>$null
+    $ahead    = 0
+    $behind   = 0
+    if ($divRaw -match "^(\d+)\s+(\d+)$") {
+        $behind = [int]$Matches[1]
+        $ahead  = [int]$Matches[2]
+    }
 
     if ($branch -ne "main") {
         Warn "$repo — on branch '$branch' (expected main)"
     } elseif ($dirty) {
         $count = ($dirty -split "`n" | Where-Object { $_ }).Count
-        Warn "$repo — $count uncommitted change(s)"
-    } elseif ([int]$unpushed -gt 0) {
-        Warn "$repo — $unpushed unpushed commit(s)"
+        Fail "$repo — $count uncommitted change(s) (commit or stash before proceeding)"
+    } elseif ($behind -gt 0 -and $ahead -gt 0) {
+        Fail "$repo — DIVERGED ($ahead ahead, $behind behind origin/main — merge required)"
+    } elseif ($behind -gt 0) {
+        Fail "$repo — $behind commit(s) behind origin/main (run: git pull)"
+    } elseif ($ahead -gt 0) {
+        Warn "$repo — $ahead unpushed commit(s)"
     } else {
-        Ok "$repo — clean, on main"
+        Ok "$repo — clean, on main, in sync"
     }
 }
 
@@ -103,10 +119,11 @@ if (Test-Path $share) {
     # Check for DEPLOY_VERSION.txt if present
     $versionFile = "$share\DEPLOY_VERSION.txt"
     if (Test-Path $versionFile) {
-        $lastDeploy = Get-Content $versionFile -Raw
-        Ok "Samba share reachable — last deploy: $($lastDeploy.Trim())"
+        $lastDeploy = (Get-Content $versionFile -Raw).Trim()
+        Ok "Samba share reachable"
+        Write-Host "         Last deploy: $lastDeploy" -ForegroundColor DarkGray
     } else {
-        Ok "Samba share reachable (no deploy record yet)"
+        Ok "Samba share reachable (no deploy record yet — run deploy-to-ha.ps1)"
     }
 } else {
     Fail "Samba share not reachable: $share (open File Explorer and connect to \\homeassistant\config)"

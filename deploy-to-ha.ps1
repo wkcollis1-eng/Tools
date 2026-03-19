@@ -71,11 +71,14 @@ if ($failed -gt 0) {
     Write-Host "Deploy completed with $failed failure(s). DO NOT reload HA until resolved." -ForegroundColor Red
     exit 1
 } else {
-    # Write deploy timestamp to HA share for audit trail
-    $version = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " | $deployed script(s)"
+    # Write deploy record to HA share — timestamp + source commit for traceability
+    $commitHash = git -C "$ReposRoot\home-assistant-config" rev-parse --short HEAD 2>$null
+    if (!$commitHash) { $commitHash = "unknown" }
+    $timestamp  = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $version    = "$timestamp | $deployed script(s) | home-assistant-config@$commitHash"
     Set-Content "\\homeassistant\config\scripts\DEPLOY_VERSION.txt" $version -ErrorAction SilentlyContinue
 
     Write-Host "$deployed script(s) deployed and verified." -ForegroundColor Cyan
-    Write-Host "Deploy version: $version" -ForegroundColor DarkGray
+    Write-Host "Deploy record: $version" -ForegroundColor DarkGray
     Write-Host "Next: Developer Tools → YAML → Reload Shell Commands" -ForegroundColor Yellow
 }
