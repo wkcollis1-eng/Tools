@@ -22,10 +22,3 @@ $RepoUrls = @{
 }
 
 $ReposRoot = "C:\repos"
-
-# Derived keyed lookup — enables scripts to access URL by name without parallel array indexing
-# Example: $RepoMap["home-assistant-config"].Url
-$RepoMap = @{}
-foreach ($name in $Repos) {
-    $RepoMap[$name] = @{ Name = $name; Url = $RepoUrls[$name]; Path = "$ReposRoot\$name" }
-}

@@ -1,4 +1,4 @@
-# C:\repos\tools\deploy-to-ha.ps1
+# C:\repos\Tools\deploy-to-ha.ps1
 # Copies live Python scripts to the HA Green Samba share.
 # Run after any commit that modifies a script file in home-assistant-config\scripts\.
 #
@@ -11,6 +11,8 @@
 
 . "$PSScriptRoot\common.ps1"
 Assert-Environment
+
+. "$PSScriptRoot\repos.ps1"
 
 $deployMap = @{
     "C:\repos\home-assistant-config\scripts\climate_norms_today.py" = "\\homeassistant\config\scripts\climate_norms_today.py"
@@ -44,9 +46,10 @@ foreach ($src in $deployMap.Keys) {
     $dst  = $deployMap[$src]
     $name = Split-Path $src -Leaf
 
-    Copy-Item $src $dst -Force
-    if ($LASTEXITCODE -ne 0 -and -not (Test-Path $dst)) {
-        Write-Host "  FAILED to copy: $name" -ForegroundColor Red
+    try {
+        Copy-Item $src $dst -Force -ErrorAction Stop
+    } catch {
+        Write-Host "  FAILED to copy: $name — $_" -ForegroundColor Red
         $failed++
         continue
     }
@@ -76,7 +79,12 @@ if ($failed -gt 0) {
     if (!$commitHash) { $commitHash = "unknown" }
     $timestamp  = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $version    = "$timestamp | $deployed script(s) | home-assistant-config@$commitHash"
-    Set-Content "\\homeassistant\config\scripts\DEPLOY_VERSION.txt" $version -ErrorAction SilentlyContinue
+    try {
+        Set-Content "\\homeassistant\config\scripts\DEPLOY_VERSION.txt" $version -ErrorAction Stop
+    } catch {
+        Write-Host "Warning: could not write DEPLOY_VERSION.txt — $_" -ForegroundColor Yellow
+        Write-Host "Scripts deployed successfully but deploy record was not updated." -ForegroundColor Yellow
+    }
 
     Write-Host "$deployed script(s) deployed and verified." -ForegroundColor Cyan
     Write-Host "Deploy record: $version" -ForegroundColor DarkGray

@@ -1,4 +1,19 @@
 # push-tools-to-github.ps1
+#
+# !! DEPRECATED — DO NOT USE !!
+#
+# This script was used during initial toolkit setup to copy files from a Desktop
+# staging folder to C:\repos\Tools and push to GitHub. It is now superseded by:
+#
+#   bootstrap.ps1        — full first-time machine setup
+#   sync-notes.ps1       — commit and push doc/issue changes
+#   push-all-repos.ps1   — push all managed repos
+#
+# This file is retained for historical reference only.
+# The file list is stale — many scripts added since are not included.
+# Hard-coded paths (billn\OneDrive) are machine-specific and will fail elsewhere.
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # Copies tools repo files from Desktop\files to C:\repos\Tools and pushes to GitHub.
 # Run this once from any PowerShell window.
 #

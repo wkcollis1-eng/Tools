@@ -67,6 +67,28 @@ Defines how each type of failure is handled across all scripts. New scripts must
 
 ---
 
+## Claude Code integration
+
+`CLAUDE_TOOLS.md` is an ultra-minified version of this README optimized for Claude Code sessions. It covers all contracts, workflows, scripts, and failure modes in ~150 lines instead of ~900 — reducing token consumption per lookup by ~85%.
+
+**Setup (one-time):**
+
+```powershell
+# 1. Copy CLAUDE_TOOLS.md to the tools repo (already done if you pulled recently)
+# 2. Inject a reference into each repo's CLAUDE.md:
+cd C:\repos\Tools
+.\inject-tools-ref.ps1
+.\push-all-repos.ps1
+```
+
+**How Claude Code uses it:**
+
+During any session, Claude Code reads `CLAUDE_TOOLS.md` as the authoritative reference instead of `README.md`. The Task → Script mapping table at the top lets it pattern-match directly from your request to the correct command without reading through documentation. The contracts section ensures it enforces the same invariants and failure model the scripts enforce.
+
+`README.md` remains the human-readable reference for setup, detailed parameters, and troubleshooting.
+
+---
+
 ## Prerequisites
 
 Before using any script, confirm the following are installed and working on your Windows PC.
@@ -298,6 +320,16 @@ Unblock-File .\bootstrap.ps1
 ```
 
 This is the only script that can be run before the toolkit is set up — it has no dependency on `common.ps1` or `repos.ps1` being present. After it completes, run `verify-system.ps1` to confirm everything is clean.
+
+---
+
+### `inject-tools-ref.ps1`
+Adds a `CLAUDE_TOOLS.md` reference block to each repo's `CLAUDE.md`. Safe to re-run — skips repos where the reference already exists. Run once after initial setup.
+
+```powershell
+.\inject-tools-ref.ps1
+.\push-all-repos.ps1    # commit the CLAUDE.md updates
+```
 
 ---
 
@@ -825,6 +857,8 @@ C:\repos\
 │   ├── repos.ps1                   ← single source of truth for repo list
 │   ├── common.ps1                  ← shared Assert-Environment, dot-sourced by all scripts
 │   ├── .pre-commit-config.yaml
+│   ├── CLAUDE_TOOLS.md             ← ultra-min Claude Code reference
+│   ├── inject-tools-ref.ps1
 │   ├── bootstrap.ps1
 │   ├── session-start.ps1
 │   ├── session-end.ps1

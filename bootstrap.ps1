@@ -9,7 +9,7 @@
 #
 # Usage (run from any directory in PowerShell):
 #   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-#   cd C:\Users\billn\OneDrive\Desktop\files   # or wherever you downloaded this
+#   cd <directory where you downloaded bootstrap.ps1>
 #   Unblock-File .\bootstrap.ps1
 #   .\bootstrap.ps1
 
@@ -113,11 +113,32 @@ Write-Host "  OK    Scripts unblocked" -ForegroundColor Green
 Set-Location $toolsPath
 Write-Host "  Cloning remaining repos..." -ForegroundColor Yellow
 & "$toolsPath\clone-all-repos.ps1"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ""
+    Write-Host "WARNING: one or more repos failed to clone (see above)." -ForegroundColor Yellow
+    Write-Host "Continuing bootstrap — re-run clone-all-repos.ps1 after resolving." -ForegroundColor Yellow
+}
 
 # ── Step 6: Install pre-commit hooks ─────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 6 of 6 — Install pre-commit hooks" -ForegroundColor White
-& "$toolsPath\install-precommit-all.ps1"
+
+# On re-runs, skip if hooks are already installed in the tools repo to avoid
+# unnecessary pre-commit autoupdate network calls on every bootstrap execution.
+$hooksAlreadyInstalled = Test-Path "$toolsPath\.git\hooks\pre-commit"
+if ($hooksAlreadyInstalled) {
+    Write-Host "  OK    Pre-commit hooks already installed (skipping autoupdate)" -ForegroundColor Green
+    Write-Host "         Run .\install-precommit-all.ps1 directly to update hook versions." -ForegroundColor Gray
+} else {
+    try {
+        & "$toolsPath\install-precommit-all.ps1"
+        if ($LASTEXITCODE -ne 0) { throw "install-precommit-all exited $LASTEXITCODE" }
+    } catch {
+        Write-Host ""
+        Write-Host "WARNING: pre-commit hook installation failed: $_" -ForegroundColor Yellow
+        Write-Host "Bootstrap will complete — run .\install-precommit-all.ps1 manually to retry." -ForegroundColor Yellow
+    }
+}
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 Write-Host ""

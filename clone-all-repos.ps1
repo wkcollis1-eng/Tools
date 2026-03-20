@@ -6,6 +6,8 @@ if (!(Get-Command git -ErrorAction SilentlyContinue)) { throw "git is not instal
 
 . "$PSScriptRoot\repos.ps1"
 
+$failed = @()
+
 foreach ($repo in $Repos) {
     $path = "$ReposRoot\$repo"
     $url  = $RepoUrls[$repo]
@@ -17,9 +19,17 @@ foreach ($repo in $Repos) {
         git clone $url $path
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  FAILED to clone $repo" -ForegroundColor Red
+            $failed += $repo
         }
     }
 }
 
 Write-Host ""
-Write-Host "All repos cloned to $ReposRoot" -ForegroundColor Cyan
+if ($failed.Count -gt 0) {
+    Write-Host "$($failed.Count) repo(s) failed to clone:" -ForegroundColor Red
+    $failed | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+    Write-Host "Check your network connection and gh auth status, then re-run." -ForegroundColor Yellow
+    exit 1
+} else {
+    Write-Host "All repos cloned to $ReposRoot" -ForegroundColor Cyan
+}

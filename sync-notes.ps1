@@ -24,7 +24,9 @@ if (!$changes) {
 Write-Host "Changes to sync:" -ForegroundColor Cyan
 git status --short
 
-git add .
+# Stage only doc/issue files — not .ps1 scripts (those are code changes, not notes).
+# Scope: markdown files, issues directory, and YAML/config docs at repo root.
+git add "*.md" "issues" "*.yaml" "*.yml"
 git commit -m $Message
 if ($LASTEXITCODE -ne 0) { throw "git commit failed." }
 

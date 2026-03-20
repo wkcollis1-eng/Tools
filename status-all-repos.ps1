@@ -21,6 +21,9 @@ foreach ($repo in $Repos) {
 
     $branch   = git rev-parse --abbrev-ref HEAD 2>$null
     $unpushed = git rev-list "@{u}..HEAD" --count 2>$null
+    # $unpushed is null/empty if no upstream is configured (new repo or detached HEAD)
+    $unpushedDisplay = if ($unpushed -match '^\d+$') { $unpushed } else { "no upstream" }
+    $unpushedColor   = if ($unpushed -match '^\d+$' -and [int]$unpushed -gt 0) { "Yellow" } else { "Gray" }
     $changes  = git status --short
 
     $branchColor = if ($branch -eq "main") { "Cyan" } else { "Yellow" }
@@ -28,7 +31,7 @@ foreach ($repo in $Repos) {
     Write-Host ""
     Write-Host "=== $repo ===" -ForegroundColor Cyan
     Write-Host "  Branch  : $branch" -ForegroundColor $branchColor
-    Write-Host "  Unpushed: $unpushed commit(s)" -ForegroundColor $(if ([int]$unpushed -gt 0) { "Yellow" } else { "Gray" })
+    Write-Host "  Unpushed: $unpushedDisplay commit(s)" -ForegroundColor $unpushedColor
 
     if ($changes) {
         Write-Host "  Changes :" -ForegroundColor Yellow

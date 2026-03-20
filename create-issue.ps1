@@ -15,7 +15,8 @@ param(
     [switch]$OpenInBrowser
 )
 
-if (!(Get-Command gh -ErrorAction SilentlyContinue)) { throw "gh CLI is not installed or not on PATH. See https://cli.github.com" }
+. "$PSScriptRoot\common.ps1"
+Assert-Environment -RequireGh
 
 . "$PSScriptRoot\repos.ps1"
 
@@ -35,7 +36,11 @@ if ($BodyFile -ne "") {
     }
     $ghArgs += @("--body-file", $BodyFile)
 } elseif ($Body -ne "") {
-    $ghArgs += @("--body", $Body)
+    # Write body to temp file and use --body-file to avoid Windows argument
+    # escaping issues with backticks, code blocks, and special characters.
+    $tmpFile = [System.IO.Path]::GetTempFileName()
+    Set-Content $tmpFile $Body -Encoding UTF8
+    $ghArgs += @("--body-file", $tmpFile)
 } else {
     # No body provided — open editor (gh default behavior)
     Write-Host "No -Body or -BodyFile provided. gh will open your editor..." -ForegroundColor Yellow
@@ -43,6 +48,9 @@ if ($BodyFile -ne "") {
 
 Write-Host "Creating issue in wkcollis1-eng/$Repo..." -ForegroundColor Green
 $issueUrl = & gh @ghArgs
+
+# Clean up temp body file if one was created
+if ($tmpFile -and (Test-Path $tmpFile)) { Remove-Item $tmpFile -ErrorAction SilentlyContinue }
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "gh issue create failed (exit code $LASTEXITCODE)" -ForegroundColor Red

@@ -3,7 +3,8 @@
 # Warns if a repo is not on main — does not abort (allows intentional branch pushes).
 # Run status-all-repos.ps1 first to confirm what will be pushed.
 
-if (!(Get-Command git -ErrorAction SilentlyContinue)) { throw "git is not installed or not on PATH." }
+. "$PSScriptRoot\common.ps1"
+Assert-Environment
 
 . "$PSScriptRoot\repos.ps1"
 
@@ -47,13 +48,16 @@ Set-Location "$ReposRoot\tools"
 # Summary
 Write-Host ""
 Write-Host "PUSH SUMMARY" -ForegroundColor Cyan
+$anyFailed = $false
 foreach ($repo in $Repos) {
     $status = $results[$repo]
     $color  = switch -Wildcard ($status) {
         "pushed*"         { "Green" }
         "nothing to push" { "Gray" }
-        "failed"          { "Red" }
+        "failed"          { "Red"; $anyFailed = $true }
         default           { "Yellow" }
     }
     Write-Host "  $repo — $status" -ForegroundColor $color
 }
+
+if ($anyFailed) { exit 1 }

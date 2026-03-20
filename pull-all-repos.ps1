@@ -50,13 +50,16 @@ Set-Location $PSScriptRoot
 # Summary
 Write-Host ""
 Write-Host "PULL SUMMARY" -ForegroundColor Cyan
+$anyFailed = $false
 foreach ($repo in $Repos) {
     $status = $results[$repo]
     $color  = switch ($status) {
         "updated"    { "Green" }
         "up to date" { "Gray" }
-        "failed"     { "Red" }
+        "failed"     { "Red"; $anyFailed = $true }
         default      { "Yellow" }
     }
     Write-Host "  $repo — $status" -ForegroundColor $color
 }
+
+if ($anyFailed) { exit 1 }

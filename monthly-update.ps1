@@ -41,13 +41,9 @@ $monthDisplay = $Month   # e.g. 2026-03
 $year  = $Month.Split('-')[0]
 $mo    = $Month.Split('-')[1]
 
-# Repos that receive a release tag on Phase 2
-$releaseRepos = @(
-    "home-assistant-config",
-    "Residential-HVAC-Performance-Baseline-",
-    "Lifepo4-Battery-Banks",
-    "DIY-LiFePO4-UPS"
-)
+# Repos that receive a release tag on Phase 2 — all repos except tools itself.
+# Derived from repos.ps1 so adding a new repo there automatically includes it here.
+$releaseRepos = $Repos | Where-Object { $_ -ne "tools" }
 
 # ─────────────────────────────────────────────────────────────────────────────
 function Step($msg) {

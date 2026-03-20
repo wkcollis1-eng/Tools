@@ -91,26 +91,35 @@ if (!$body -or $body -match '<!--') {
 }
 
 # ── Build gh command ───────────────────────────────────────────────────────────
-$ghArgs = @(
-    "issue", "create",
-    "--repo",  "wkcollis1-eng/$repo",
-    "--title", $title,
-    "--body",  $body
-)
+# Write body to a temp file and use --body-file to avoid Windows argument
+# escaping issues with backticks, code blocks, and special characters in --body.
+$bodyFile = [System.IO.Path]::GetTempFileName()
+try {
+    Set-Content $bodyFile $body -Encoding UTF8
 
-if ($labels) {
-    $ghArgs += @("--label", $labels)
-}
+    $ghArgs = @(
+        "issue", "create",
+        "--repo",      "wkcollis1-eng/$repo",
+        "--title",     $title,
+        "--body-file", $bodyFile
+    )
 
-Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green
-Write-Host "  Title: $title" -ForegroundColor Cyan
-if ($labels) { Write-Host "  Labels: $labels" -ForegroundColor Cyan }
+    if ($labels) {
+        $ghArgs += @("--label", $labels)
+    }
 
-$issueUrl = & gh @ghArgs
+    Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green
+    Write-Host "  Title: $title" -ForegroundColor Cyan
+    if ($labels) { Write-Host "  Labels: $labels" -ForegroundColor Cyan }
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "gh issue create failed." -ForegroundColor Red
-    exit 1
+    $issueUrl = & gh @ghArgs
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "gh issue create failed." -ForegroundColor Red
+        exit 1
+    }
+} finally {
+    Remove-Item $bodyFile -ErrorAction SilentlyContinue
 }
 
 Write-Host "Created: $issueUrl" -ForegroundColor Green

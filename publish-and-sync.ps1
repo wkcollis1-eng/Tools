@@ -81,8 +81,10 @@ Write-Host ""
 Write-Host "Step 3 of 3 — Sync notes" -ForegroundColor White
 
 $slug = Split-Path $File -Leaf
-& "$PSScriptRoot\sync-notes.ps1" -Message "docs: publish issue $slug"
-if ($LASTEXITCODE -ne 0) {
+try {
+    & "$PSScriptRoot\sync-notes.ps1" -Message "docs: publish issue $slug"
+    if ($LASTEXITCODE -ne 0) { throw "sync-notes exited $LASTEXITCODE" }
+} catch {
     Write-Host "Sync failed — issue was published but local file not committed." -ForegroundColor Yellow
     Write-Host "Run: .\sync-notes.ps1 manually to save the published_url." -ForegroundColor Yellow
     exit 1

@@ -3,16 +3,21 @@
 # Also runs pre-commit autoupdate to get current hook versions.
 # Run once after initial clone. Safe to re-run.
 
-if (!(Get-Command git -ErrorAction SilentlyContinue))    { throw "git is not installed or not on PATH." }
-if (!(Get-Command python -ErrorAction SilentlyContinue)) { throw "python is not installed or not on PATH." }
+. "$PSScriptRoot\common.ps1"
+Assert-Environment -RequirePython
 
 . "$PSScriptRoot\repos.ps1"
 
-# Install pre-commit if not present
+# Install pre-commit if not present.
+# Try pip first, fall back to pip3 — Windows setups vary on which is on PATH.
 if (!(Get-Command pre-commit -ErrorAction SilentlyContinue)) {
     Write-Host "Installing pre-commit..." -ForegroundColor Yellow
-    pip install pre-commit --quiet
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install pre-commit." }
+    $pipCmd = if (Get-Command pip -ErrorAction SilentlyContinue) { "pip" }
+              elseif (Get-Command pip3 -ErrorAction SilentlyContinue) { "pip3" }
+              else { $null }
+    if (!$pipCmd) { throw "Neither pip nor pip3 found on PATH. Install Python with pip and retry." }
+    & $pipCmd install pre-commit --quiet
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install pre-commit via $pipCmd." }
 }
 
 foreach ($repo in $Repos) {
@@ -33,7 +38,10 @@ foreach ($repo in $Repos) {
     Set-Location $path
 
     Write-Host "[$repo] Installing hooks..." -ForegroundColor Green
-    pre-commit install --quiet
+    pre-commit install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[$repo] WARNING: pre-commit install failed (see above)" -ForegroundColor Yellow
+    }
 
     Write-Host "[$repo] Updating hook versions..." -ForegroundColor Green
     pre-commit autoupdate

@@ -52,9 +52,16 @@ if (Test-Path $outputFile) {
     exit 1
 }
 
-# Copy template and inject repo into frontmatter
+# Copy template and inject repo into frontmatter.
+# Use a regex to match any existing 'repo: <value>' line so the replacement
+# works regardless of what default repo the template contains.
 $content = Get-Content $template -Raw
-$content = $content -replace 'repo: home-assistant-config', "repo: $Repo"
+if ($content -match '(?m)^repo:\s*.+$') {
+    $content = $content -replace '(?m)^repo:\s*.+$', "repo: $Repo"
+} else {
+    Write-Host "WARNING: template does not contain a 'repo:' frontmatter line — injecting one." -ForegroundColor Yellow
+    $content = $content -replace '^---', "---`nrepo: $Repo"
+}
 $content | Set-Content $outputFile -NoNewline
 
 Write-Host "Created: $outputFile" -ForegroundColor Green

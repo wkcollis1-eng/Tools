@@ -78,6 +78,16 @@ if ($LASTEXITCODE -ne 0) {
 $draftNote = if ($Draft) { " (draft)" } else { "" }
 Write-Host "Release $Tag created$draftNote" -ForegroundColor Green
 
+# Fetch tags locally so git describe --tags reflects the new tag immediately.
+# gh release create only writes the tag on GitHub — without this, monthly-update.ps1
+# will not find the tag until the next git fetch and will over-count commits.
+$repoPathForFetch = "$ReposRoot\$Repo"
+if (Test-Path "$repoPathForFetch\.git") {
+    Set-Location $repoPathForFetch
+    git fetch --tags --quiet 2>$null
+    Set-Location $PSScriptRoot
+}
+
 # ── Step 3: Push ──────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 3 of 3 — Push $Repo" -ForegroundColor White
