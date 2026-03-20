@@ -1,17 +1,25 @@
-# C:\repos\tools\common.ps1
-# Shared environment validation. Dot-sourced by every script in this toolkit.
+# C:\repos\Tools\common.ps1
+# Shared infrastructure. Dot-sourced by every script in this toolkit.
 # Never run directly.
 #
-# Usage in scripts:
+# Exports:
+#   Assert-Environment  — pre-flight tool/auth checks
+#   Test-GitRepo        — authoritative .git existence check
+#   Get-Frontmatter     — YAML frontmatter parser for issue files
+#   $SambaSharePath     — canonical HA share UNC path
+#
+# Usage:
 #   . "$PSScriptRoot\common.ps1"
-#   Assert-Environment                                        # git + identity only
-#   Assert-Environment -RequireGh                            # + gh CLI + auth
-#   Assert-Environment -RequireGh -RequirePython             # + python 3.x
-#   Assert-Environment -RequireGh -RequirePython -RequirePreCommit  # + pre-commit
-#   Assert-Environment -RequirePython -RequireSamba          # + samba share
+#   Assert-Environment                                              # git 2.x + identity
+#   Assert-Environment -RequireGh                                   # + gh CLI + auth
+#   Assert-Environment -RequireGh -RequirePython                    # + python 3.x
+#   Assert-Environment -RequireGh -RequirePython -RequirePreCommit  # + pre-commit module
+#   Assert-Environment -RequirePython -RequireSamba                 # + Samba share reachable
+#   if (!(Test-GitRepo $path)) { ... }
+#   $parsed = Get-Frontmatter "issues\foo.md"
 #
 # Version stamp — increment when this file changes
-$CommonVersion = "1.1.0"
+$CommonVersion = "1.3.0"
 
 # Samba share path used by deploy-to-ha.ps1 and verify-system.ps1
 $SambaSharePath = "\\homeassistant\config\scripts"
@@ -80,4 +88,75 @@ function Assert-Environment {
             throw "Samba share is not reachable: $SambaSharePath`nEnsure Home Assistant is running and the network share is mounted."
         }
     }
+}
+
+# ── Test-GitRepo ──────────────────────────────────────────────────────────────
+# Standard .git existence check for use across all scripts.
+#
+# Why this exists:
+#   Test-Path $path           — wrong: passes if dir exists but was never cloned
+#   Test-Path "$path\.git\"   — fragile: trailing backslash variant is inconsistent
+#   Test-Path "$path/.git"    — wrong separator on Windows in some edge cases
+#
+# This function is the single authoritative check. All batch loops (pull, push,
+# status, deploy, monthly-update, etc.) must use this instead of inline variants.
+#
+# Returns $true only when $Path contains a valid git repository directory.
+# Distinguishes three states callers care about:
+#   $true   — repo is present and initialized
+#   $false  — directory exists but is NOT a git repo (warn the user)
+#   $false  — directory does not exist at all (also $false — caller checks as needed)
+#
+# Usage:
+#   if (!(Test-GitRepo $repoPath)) { Write-Host "[$repo] Not cloned — skipping"; continue }
+#
+# ── Get-Frontmatter ───────────────────────────────────────────────────────────
+# Parses the YAML frontmatter block from a local issue file.
+# Used by publish-issue.ps1, list-issues.ps1, and publish-and-sync.ps1.
+# Centralised here so the parser is not duplicated across those three files.
+#
+# Returns a PSCustomObject with:
+#   .Frontmatter   — hashtable of key → value pairs from the --- block
+#   .BodyStartLine — 0-based index of the first line after the closing ---
+#   .Lines         — full file content as a string array (UTF-8)
+#
+# Usage:
+#   $parsed      = Get-Frontmatter "issues\ha-config_foo.md"
+#   $repo        = $parsed.Frontmatter['repo']
+#   $body        = ($parsed.Lines[$parsed.BodyStartLine..($parsed.Lines.Count-1)] | Out-String).Trim()
+#
+function Get-Frontmatter {
+    param(
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    $lines        = Get-Content $Path -Encoding UTF8
+    $frontmatter  = @{}
+    $bodyStart    = 0
+    $inFM         = $false
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $l = $lines[$i].Trim()
+        if (!$inFM -and $l -eq '---') { $inFM = $true; continue }
+        if ( $inFM -and $l -eq '---') { $bodyStart = $i + 1; break }
+        if ( $inFM -and $l -match '^(\w+):\s*"?(.+?)"?\s*$') {
+            $frontmatter[$Matches[1]] = $Matches[2]
+        }
+    }
+
+    return [PSCustomObject]@{
+        Frontmatter   = $frontmatter
+        BodyStartLine = $bodyStart
+        Lines         = $lines
+    }
+}
+
+function Test-GitRepo {
+    param(
+        [Parameter(Mandatory)][string]$Path
+    )
+    # Use -PathType Container to confirm .git is a directory, not a file.
+    # (A bare repo or a git worktree uses a .git file, not a directory — both
+    # are unsupported by this toolkit, so treating them as "not a repo" is correct.)
+    return (Test-Path (Join-Path $Path ".git") -PathType Container)
 }

@@ -1,61 +1,77 @@
 # C:\repos\Tools\sync-notes.ps1
-# Stages, commits, and pushes README and issue draft changes in the Tools repo.
-# Use for README updates, issue drafts, and other documentation changes.
-# Does nothing if there is nothing to commit in the scoped paths.
+# Stages, commits, and pushes README.md and issues\ changes in the Tools repo.
+# Deliberately scoped — only stages README.md and issues\, never .ps1 files or
+# anything else (those belong in a proper code commit via push-all-repos.ps1).
+# Does nothing if neither README.md nor issues\ has changes.
 #
 # Usage:
-#   .\sync-notes.ps1
-#   .\sync-notes.ps1 -Message "docs: add cooling buildout issue draft"
+#   .\sync-notes.ps1                                            # auto-detect message
+#   .\sync-notes.ps1 -Message "docs: add cooling buildout draft"
 
 param(
     [string]$Message = ""
 )
 
-if (!(Get-Command git -ErrorAction SilentlyContinue)) {
-    Write-Host "git is not installed or not on PATH." -ForegroundColor Red
-    exit 1
-}
+. "$PSScriptRoot\common.ps1"
+Assert-Environment
 
 Set-Location $PSScriptRoot
 
-# Check overall working tree first for informational output
-$allChanges = git status --porcelain
-if (!$allChanges) {
+$changes = git status --porcelain 2>$null
+if (!$changes) {
     Write-Host "Nothing to sync — working tree is clean." -ForegroundColor Gray
     exit 0
 }
 
-# Scope git add to README.md and issues\ only — avoid staging .ps1 scripts or
-# other code changes that belong in a proper code commit.
-git add README.md 2>$null
-if (Test-Path "$PSScriptRoot\issues") {
-    git add issues\ 2>$null
-}
+# ── Auto-detect commit message ────────────────────────────────────────────────
+if (!$Message) {
+    $fileList = @()
+    foreach ($line in $changes) {
+        $file = $line.Substring(3).Trim()
+        if ($file -match '\.md$' -or $file -match '^issues[/\\]') {
+            $fileList += $file
+        }
+    }
 
-# Check if anything was actually staged in those scoped paths
-$staged = git diff --cached --name-only
-if (!$staged) {
-    Write-Host "No README or issues changes to sync." -ForegroundColor Gray
-    Write-Host "(Other changes exist — commit them with a proper code commit message.)" -ForegroundColor DarkGray
-    exit 0
+    if ($fileList.Count -eq 0) {
+        $Message = "docs: update notes and issue files"
+    } elseif ($fileList.Count -eq 1) {
+        $file = $fileList[0]
+        if ($file -eq 'README.md') {
+            $Message = "docs: update README.md"
+        } elseif ($file -match '^issues[/\\](.+)$') {
+            $Message = "docs: update issues/$($Matches[1])"
+        } else {
+            $Message = "docs: update $file"
+        }
+    } else {
+        $issueFiles = $fileList | Where-Object { $_ -match '^issues[/\\]' }
+        $otherFiles = $fileList | Where-Object { $_ -notmatch '^issues[/\\]' }
+        if ($issueFiles.Count -gt 0 -and $otherFiles.Count -eq 0) {
+            $Message = if ($issueFiles.Count -eq 1) {
+                "docs: update issues/$($issueFiles[0] -replace '^issues[/\\]', '')"
+            } else { "docs: update multiple issue files" }
+        } elseif ($issueFiles.Count -gt 0 -and $otherFiles.Count -gt 0) {
+            $Message = "docs: update notes and issue files"
+        } else {
+            $Message = "docs: update notes"
+        }
+    }
 }
 
 Write-Host "Changes to sync:" -ForegroundColor Cyan
-$staged | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+git status --short
 
-# Auto-generate commit message from staged files if none provided
-if ($Message -eq "") {
-    $issueFiles   = $staged | Where-Object { $_ -match '^issues[\\/]' }
-    $readmeChange = $staged | Where-Object { $_ -match 'README\.md' }
+# ── Stage only scoped paths ───────────────────────────────────────────────────
+# Explicit scoping prevents accidentally staging .ps1 files or other changes
+# that belong in a code commit rather than a doc sync.
+if (Test-Path (Join-Path $PSScriptRoot "README.md")) { git add "README.md" }
+if (Test-Path (Join-Path $PSScriptRoot "issues"))     { git add "issues/" }
 
-    if ($issueFiles -and $readmeChange) {
-        $Message = "docs: update README and $($issueFiles.Count) issue draft(s)"
-    } elseif ($issueFiles) {
-        $firstIssue = Split-Path ($issueFiles | Select-Object -First 1) -Leaf
-        $Message = "docs: update issue draft ($firstIssue)"
-    } else {
-        $Message = "docs: update README"
-    }
+$staged = git diff --cached --name-only 2>$null
+if (!$staged) {
+    Write-Host "Nothing staged after scoped add (no README.md or issues\ changes)." -ForegroundColor Gray
+    exit 0
 }
 
 git commit -m $Message
@@ -64,11 +80,13 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# FIX: 'throw "git push failed..."' replaced with Write-Host + exit 1.
+# throw unwinds differently from exit 1 when called from a parent script —
+# the error display may be noisy or swallowed depending on the caller's
+# error handling. exit 1 is the toolkit standard for hard failures.
 git push
 if ($LASTEXITCODE -ne 0) {
-    # BUG FIX: Replace throw with Write-Host + exit 1 so parent scripts (session-end.ps1)
-    # receive a clean exit code rather than a noisy terminating exception.
-    Write-Host "git push failed. Check credentials (gh auth login)." -ForegroundColor Red
+    Write-Host "git push failed — check credentials (gh auth login)." -ForegroundColor Red
     exit 1
 }
 

@@ -1,95 +1,136 @@
 # C:\repos\Tools\status-all-repos.ps1
-# Runs git status --short in every managed repo.
-# Also shows current branch, last commit, and unpushed commit count.
-# Use before committing or pushing for a quick sanity check.
+# Shows branch, last commit, unpushed commits, unpushed tags, and changed files
+# for every managed repo. Use before committing or pushing.
 #
 # Usage:
-#   .\status-all-repos.ps1           # Normal output
-#   .\status-all-repos.ps1 -Table    # Compact formatted table
+#   .\status-all-repos.ps1          # standard per-repo output
+#   .\status-all-repos.ps1 -Table   # compact formatted table
 
 param(
     [switch]$Table
 )
 
-if (!(Get-Command git -ErrorAction SilentlyContinue)) { throw "git is not installed or not on PATH." }
-
+. "$PSScriptRoot\common.ps1"
+Assert-Environment
 . "$PSScriptRoot\repos.ps1"
 
-$tableRows = @()
+$statusData = [System.Collections.Generic.List[PSCustomObject]]::new()
 
 foreach ($repo in $Repos) {
     $path = $RepoMap[$repo].Path
 
-    if (!(Test-Path "$path\.git")) {
-        Write-Host ""
-        Write-Host "=== $repo ===" -ForegroundColor Yellow
-        Write-Host "  Not cloned" -ForegroundColor Yellow
-
-        if ($Table) {
-            $tableRows += [PSCustomObject]@{
-                Repo      = $repo
-                Branch    = "—"
-                Unpushed  = "—"
-                Changes   = "not cloned"
-                LastCommit = "—"
-            }
+    if (!(Test-GitRepo $path)) {
+        if (!$Table) {
+            Write-Host ""
+            Write-Host "=== $repo ===" -ForegroundColor Yellow
+            Write-Host "  Not cloned (run: .\clone-all-repos.ps1)" -ForegroundColor Yellow
         }
+        $statusData.Add([PSCustomObject]@{
+            Repo              = $repo
+            Branch            = "N/A"
+            Changes           = 0
+            UnpushedCommits   = 0
+            UnpushedTags      = 0
+            LastCommitHash    = "N/A"
+            LastCommitMessage = "N/A"
+            Status            = "Not cloned"
+        })
         continue
     }
 
-    Set-Location $path
+    # ── Gather repo state via git -C (no Set-Location) ────────────────────────
+    $branch   = (git -C $path rev-parse --abbrev-ref HEAD 2>$null)
+    $branch   = if ($branch) { $branch.Trim() } else { "unknown" }
 
-    $branch   = git rev-parse --abbrev-ref HEAD 2>$null
-    $unpushed = git rev-list "@{u}..HEAD" --count 2>$null
+    $changes  = git -C $path status --short 2>$null
 
-    # Safe display — null/empty means no upstream configured (new repo or detached HEAD)
-    $unpushedDisplay = if ($unpushed -match '^\d+$') { $unpushed } else { "no upstream" }
-    $unpushedColor   = if ($unpushed -match '^\d+$' -and [int]$unpushed -gt 0) { "Yellow" } else { "Gray" }
+    $hashFull = (git -C $path rev-parse HEAD 2>$null)
+    $hash     = if ($hashFull -and $hashFull.Length -ge 8) { $hashFull.Substring(0, 8) } else { "unknown" }
+    $subject  = (git -C $path log -1 --pretty=format:"%s" 2>$null)
 
-    $changes = git status --short
+    # Unpushed commit count — safe cast handles null (no upstream branch)
+    $unpushedRaw    = git -C $path rev-list "@{u}..HEAD" --count 2>$null
+    $unpushedCount  = [int]($unpushedRaw.Trim() -as [int])
+    $unpushedDisplay = if ($null -eq $unpushedRaw -or $unpushedRaw.Trim() -eq "") { "no upstream" } else { $unpushedCount }
 
-    # Last commit: short hash + subject
-    $lastHash    = git rev-parse --short HEAD 2>$null
-    $lastSubject = git log -1 --format="%s" 2>$null
-    $lastCommit  = if ($lastHash) { "$lastHash  $lastSubject" } else { "—" }
-
-    $branchColor = if ($branch -eq "main") { "Cyan" } else { "Yellow" }
-
-    if (-not $Table) {
-        Write-Host ""
-        Write-Host "=== $repo ===" -ForegroundColor Cyan
-        Write-Host "  Branch    : $branch" -ForegroundColor $branchColor
-        Write-Host "  Unpushed  : $unpushedDisplay commit(s)" -ForegroundColor $unpushedColor
-        Write-Host "  Last Commit: $lastCommit" -ForegroundColor DarkGray
-
-        if ($changes) {
-            Write-Host "  Changes   :" -ForegroundColor Yellow
-            foreach ($line in $changes) {
-                $color = if ($line -match "^\?\?") { "Gray" }
-                         elseif ($line -match "^M|^A|^D") { "Green" }
-                         else { "Yellow" }
-                Write-Host "    $line" -ForegroundColor $color
-            }
-        } else {
-            Write-Host "  Changes   : none" -ForegroundColor Gray
+    # Unpushed tags — single remote call for performance
+    $unpushedTags = 0
+    $hasCommits = [int]((git -C $path rev-list --count HEAD 2>$null).Trim() -as [int])
+    if ($hasCommits -gt 0) {
+        $localTags = git -C $path tag 2>$null
+        if ($localTags) {
+            $remoteTags = git -C $path ls-remote --tags origin 2>$null |
+                ForEach-Object { ($_ -split '\s+')[1] -replace '^refs/tags/', '' -replace '\^\{\}$', '' }
+            $unpushedTags = ($localTags | Where-Object { $_ -notin $remoteTags }).Count
         }
     }
 
-    if ($Table) {
-        $changeCount = if ($changes) { ($changes | Measure-Object).Count } else { 0 }
-        $tableRows += [PSCustomObject]@{
-            Repo       = $repo
-            Branch     = $branch
-            Unpushed   = $unpushedDisplay
-            Changes    = $changeCount
-            LastCommit = $lastCommit
+    $changeCount = if ($changes) { ($changes | Measure-Object).Count } else { 0 }
+
+    $overallStatus = if ($changeCount -gt 0)      { "Modified" }
+                     elseif ($unpushedCount -gt 0) { "Unpushed" }
+                     elseif ($unpushedTags  -gt 0) { "Unpushed" }
+                     else                           { "Clean"    }
+
+    $statusData.Add([PSCustomObject]@{
+        Repo              = $repo
+        Branch            = $branch
+        Changes           = $changeCount
+        UnpushedCommits   = $unpushedCount
+        UnpushedTags      = $unpushedTags
+        LastCommitHash    = $hash
+        LastCommitMessage = $subject
+        Status            = $overallStatus
+    })
+
+    if (!$Table) {
+        $branchColor    = if ($branch -eq "main") { "Cyan" } else { "Yellow" }
+        $unpushedColor  = if ($unpushedCount -gt 0) { "Yellow" } else { "Gray" }
+
+        Write-Host ""
+        Write-Host "=== $repo ===" -ForegroundColor Cyan
+        Write-Host "  Branch  : $branch" -ForegroundColor $branchColor
+        Write-Host "  Unpushed: $unpushedDisplay commit(s)" -ForegroundColor $unpushedColor
+        if ($unpushedTags -gt 0) {
+            Write-Host "  Unpushed Tags: $unpushedTags" -ForegroundColor Yellow
+        }
+        Write-Host "  Last    : $hash — $subject" -ForegroundColor DarkGray
+
+        if ($changes) {
+            Write-Host "  Changes :" -ForegroundColor Yellow
+            foreach ($line in $changes) {
+                $lineColor = if   ($line -match '^\?\?')          { "Gray"   }
+                             elseif ($line -match '^[MAD]')       { "Green"  }
+                             else                                  { "Yellow" }
+                Write-Host "    $line" -ForegroundColor $lineColor
+            }
+        } else {
+            Write-Host "  Changes : none" -ForegroundColor Gray
         }
     }
 }
 
-Set-Location $RepoMap["Tools"].Path
-Write-Host ""
-
+# ── Table output ──────────────────────────────────────────────────────────────
 if ($Table) {
-    $tableRows | Format-Table -AutoSize
+    $clean    = ($statusData | Where-Object Status -eq "Clean").Count
+    $modified = ($statusData | Where-Object Status -eq "Modified").Count
+    $unpushed = ($statusData | Where-Object Status -eq "Unpushed").Count
+    $missing  = ($statusData | Where-Object Status -eq "Not cloned").Count
+
+    Write-Host ""
+    Write-Host "Repository Status — $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
+    Write-Host "  $clean clean  $modified modified  $unpushed unpushed  $missing not cloned" -ForegroundColor Gray
+    Write-Host ""
+
+    $statusData | Format-Table -AutoSize -Wrap -Property @(
+        @{ Name="Repo";       Expression={ $_.Repo };              Align="Left"  }
+        @{ Name="Branch";     Expression={ $_.Branch };            Align="Left"  }
+        @{ Name="Status";     Expression={ $_.Status };            Align="Left"  }
+        @{ Name="Changes";    Expression={ $_.Changes };           Align="Right" }
+        @{ Name="Unpushed";   Expression={ $_.UnpushedCommits };   Align="Right" }
+        @{ Name="Tags";       Expression={ $_.UnpushedTags };      Align="Right" }
+        @{ Name="Last Commit";Expression={ "$($_.LastCommitHash) — $($_.LastCommitMessage)" }; Align="Left" }
+    )
+} else {
+    Write-Host ""
 }

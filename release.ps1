@@ -1,13 +1,15 @@
 # C:\repos\Tools\release.ps1
-# Creates a tagged GitHub release with validation gate for the HVAC baseline repo.
-# For the Residential-HVAC-Performance-Baseline- repo, runs validate-all.ps1
-# for the target month before tagging — a HALT stops the release.
-# For all other repos, tags immediately.
+# Creates a tagged GitHub release with a validation gate for the HVAC baseline repo.
+# For Residential-HVAC-Performance-Baseline-, runs validate-all.ps1 first —
+# a HALT stops the release. For all other repos, tags immediately.
+# Validates CalVer tag format before any GitHub call.
+# Auto-generates release notes from git log if -Notes not supplied.
+# Fetches the new tag locally after creation so git describe is immediately accurate.
 #
 # Usage:
-#   .\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026 — cooling build-out"
+#   .\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026"
 #   .\release.ps1 -Repo Residential-HVAC-Performance-Baseline- -Tag v2026.03.1 -Title "March 2026" -Month 2026-03
-#   .\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026 update" -Draft
+#   .\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026" -Draft
 
 param(
     [Parameter(Mandatory)][string]$Repo,
@@ -23,18 +25,21 @@ param(
 Assert-Environment -RequireGh
 . "$PSScriptRoot\repos.ps1"
 
+# ── Repo validation ────────────────────────────────────────────────────────────
 if ($Repo -notin $Repos) {
     Write-Host "Unknown repo '$Repo'. Valid options:" -ForegroundColor Red
     $Repos | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
 
-# BUG FIX: Validate CalVer tag format before attempting release creation.
-# Without this, a malformed tag silently creates an invalid GitHub release.
+# ── CalVer tag format validation ───────────────────────────────────────────────
 if ($Tag -notmatch '^v\d{4}\.\d{2}\.\d+$') {
-    Write-Host "Invalid tag format '$Tag'. Expected CalVer format: vYYYY.MM.N (e.g. v2026.03.1)" -ForegroundColor Red
+    Write-Host "Invalid tag format: '$Tag'" -ForegroundColor Red
+    Write-Host "Expected CalVer format: vYYYY.MM.N  (e.g. v2026.03.1)" -ForegroundColor Yellow
     exit 1
 }
+
+$repoPath = $RepoMap[$Repo].Path
 
 Write-Host ""
 Write-Host "RELEASE  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
@@ -46,10 +51,8 @@ $isHvacRepo = $Repo -eq "Residential-HVAC-Performance-Baseline-"
 if ($isHvacRepo -and !$SkipValidation) {
     Write-Host ""
     Write-Host "Step 1 of 3 — Validate HVAC data" -ForegroundColor White
-
     $validateArgs = @()
     if ($Month -ne "") { $validateArgs += @("-Month", $Month) }
-
     & "$PSScriptRoot\validate-all.ps1" @validateArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
@@ -57,40 +60,47 @@ if ($isHvacRepo -and !$SkipValidation) {
         exit 1
     }
 } else {
-    $reason = if ($SkipValidation) { "(skipped with -SkipValidation)" } else { "(not required for $Repo)" }
+    $reason = if ($SkipValidation) { "(skipped — -SkipValidation)" } else { "(not required for $Repo)" }
     Write-Host ""
-    Write-Host "Step 1 of 3 — Validation $reason" -ForegroundColor Gray
+    Write-Host "Step 1 of 3 — Validation $reason" -ForegroundColor DarkGray
 }
 
-# ── Step 2: Create release ────────────────────────────────────────────────────
+# ── Step 2: Build release notes and create release ────────────────────────────
 Write-Host ""
 Write-Host "Step 2 of 3 — Create release $Tag" -ForegroundColor White
 
-# Enhancement: auto-generate release notes from git log if -Notes not provided
-$repoPath = $RepoMap[$Repo].Path
-$releaseNotes = $Notes
+if (!$Notes) {
+    if (Test-GitRepo $repoPath) {
+        $lastTag = (git -C $repoPath describe --tags --abbrev=0 "HEAD~1" 2>$null)
+        $lastTag = if ($lastTag) { $lastTag.Trim() } else { $null }
 
-if (-not $releaseNotes -and (Test-Path "$repoPath\.git")) {
-    Set-Location $repoPath
-    $lastTag = git describe --tags --abbrev=0 HEAD^ 2>$null
-    if ($lastTag) {
-        $logLines = git log --oneline "$lastTag..HEAD" 2>$null
-        if ($logLines) {
-            $releaseNotes = "### Changes since $lastTag`n`n" + ($logLines -join "`n")
+        if ($lastTag) {
+            $gitRange   = "$lastTag..HEAD"
+            $rangeNote  = "(since $lastTag)"
+        } else {
+            $firstCommit = (git -C $repoPath rev-list --max-parents=0 HEAD 2>$null).Trim()
+            $gitRange    = "$firstCommit..HEAD"
+            $rangeNote   = "(initial release)"
         }
-    }
-    Set-Location $PSScriptRoot
-}
 
-if (-not $releaseNotes) {
-    $releaseNotes = "$Title."
+        $commitLog = git -C $repoPath log --oneline $gitRange 2>$null
+        if ($commitLog) {
+            $noteLines = $commitLog -split "`n" | Where-Object { $_.Trim() } |
+                         ForEach-Object { "- $_" }
+            $Notes = "$Title`n`n## Changes $rangeNote`n`n" + ($noteLines -join "`n")
+        } else {
+            $Notes = "$Title."
+        }
+    } else {
+        $Notes = "$Title."
+    }
 }
 
 $ghArgs = @(
     "release", "create", $Tag,
     "--repo",  "wkcollis1-eng/$Repo",
     "--title", $Title,
-    "--notes", $releaseNotes
+    "--notes", $Notes
 )
 if ($Draft) { $ghArgs += "--draft" }
 
@@ -100,33 +110,25 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-$draftNote = if ($Draft) { " (draft)" } else { "" }
-Write-Host "Release $Tag created$draftNote" -ForegroundColor Green
+Write-Host "Release $Tag created$(if ($Draft) { ' (draft)' })." -ForegroundColor Green
 
-# BUG FIX: gh release create writes the tag on GitHub only — without a local
-# git fetch --tags, git describe --tags returns stale results in subsequent
-# monthly-update.ps1 runs, causing incorrect commit-count calculations.
-if (Test-Path "$repoPath\.git") {
-    Set-Location $repoPath
-    git fetch --tags --quiet 2>$null
-    Set-Location $PSScriptRoot
-    Write-Host "Local tags updated (git fetch --tags)." -ForegroundColor DarkGray
+# Pull the new tag back locally immediately so git describe returns correct results
+# in subsequent monthly-update.ps1 and verify-system.ps1 calls.
+if (Test-GitRepo $repoPath) {
+    git -C $repoPath fetch --tags --quiet 2>$null
 }
 
 # ── Step 3: Push ──────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 3 of 3 — Push $Repo" -ForegroundColor White
 
-if (Test-Path "$repoPath\.git") {
-    Set-Location $repoPath
-    git push --quiet
+if (Test-GitRepo $repoPath) {
+    git -C $repoPath push --quiet
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Push failed — tag was created on GitHub but local push failed." -ForegroundColor Yellow
-        Write-Host "Run: cd $repoPath && git push" -ForegroundColor Yellow
-        Set-Location $PSScriptRoot
+        Write-Host "Run: git -C `"$repoPath`" push" -ForegroundColor Yellow
         exit 1
     }
-    Set-Location $PSScriptRoot
     Write-Host "Pushed." -ForegroundColor Green
 }
 

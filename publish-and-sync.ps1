@@ -1,18 +1,20 @@
 # C:\repos\Tools\publish-and-sync.ps1
 # Full issue publishing workflow in one command:
-#   1. List open GitHub issues for the target repo (duplicate check)
-#   2. Publish the local issue file to GitHub
-#   3. Sync notes (commits the updated file with published_url back to Tools repo)
+#   1. Show open GitHub issues for the target repo (duplicate check)
+#   2. Publish the local issue file to GitHub via publish-issue.ps1
+#   3. Sync notes (commits the updated file with published_url to tools repo)
 #
 # Usage:
 #   .\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md
 #   .\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md -OpenInBrowser
 #   .\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md -SkipDuplicateCheck
+#   .\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md -CreatePR
 
 param(
     [Parameter(Mandatory)][string]$File,
     [switch]$OpenInBrowser,
-    [switch]$SkipDuplicateCheck
+    [switch]$SkipDuplicateCheck,
+    [switch]$CreatePR
 )
 
 . "$PSScriptRoot\common.ps1"
@@ -29,50 +31,25 @@ if (!(Test-Path $File)) {
     exit 1
 }
 
-# Parse repo from frontmatter for the duplicate check
-$lines = Get-Content $File
-$repo  = ""
-$inFM  = $false
-foreach ($line in $lines) {
-    $l = $line.Trim()
-    if (!$inFM -and $l -eq '---') { $inFM = $true; continue }
-    if ($inFM  -and $l -eq '---') { break }
-    if ($inFM  -and $l -match '^repo:\s*(.+)$') { $repo = $Matches[1].Trim() }
-}
+# Parse repo from frontmatter using the shared parser
+$parsed = Get-Frontmatter $File
+$repo   = $parsed.Frontmatter['repo']
 
 Write-Host ""
 Write-Host "PUBLISH ISSUE  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
 Write-Host ("═" * 50) -ForegroundColor DarkGray
 
-# ── Enhancement: Confirm Tools working tree is clean before syncing ────────────
-# Unrelated staged changes would be committed alongside the issue file in Step 3.
-Set-Location $RepoMap["Tools"].Path
-$stagedOther = git diff --cached --name-only 2>$null | Where-Object { $_ -notmatch '^issues[\\/]|^README\.md' }
-if ($stagedOther) {
-    Write-Host ""
-    Write-Host "WARNING: The following files are already staged in the Tools repo:" -ForegroundColor Yellow
-    $stagedOther | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
-    Write-Host "They would be committed alongside the issue file in Step 3." -ForegroundColor Yellow
-    $clearConfirm = Read-Host "Continue anyway? (y/N)"
-    if ($clearConfirm -notmatch '^[Yy]$') {
-        Write-Host "Publish cancelled. Unstage or commit those files first." -ForegroundColor Yellow
-        exit 0
-    }
-}
-Set-Location $PSScriptRoot
-
 # ── Step 1: Duplicate check ───────────────────────────────────────────────────
 if ($SkipDuplicateCheck) {
     Write-Host ""
-    Write-Host "Step 1 of 3 — Duplicate check (skipped)" -ForegroundColor Gray
+    Write-Host "Step 1 of 3 — Duplicate check (skipped)" -ForegroundColor DarkGray
 } elseif ($repo) {
     Write-Host ""
     Write-Host "Step 1 of 3 — Open issues in wkcollis1-eng/$repo" -ForegroundColor White
     & "$PSScriptRoot\list-issues.ps1" -Remote -Repo $repo
     Write-Host ""
-    # BUG FIX: Original prompt said "No duplicates found? Continue?" which confuses
-    # users who DID find a duplicate — they have no clear path to cancel.
-    # New prompt is neutral: review what's there, then decide.
+    # FIX: original prompt said "No duplicates found? Continue?" — phrasing assumed
+    # no duplicates existed, confusing users who actually found one.
     $confirm = Read-Host "Review the open issues above. Publish anyway? (Y/n)"
     if ($confirm -match '^[Nn]$') {
         Write-Host "Publish cancelled." -ForegroundColor Yellow
@@ -80,7 +57,7 @@ if ($SkipDuplicateCheck) {
     }
 } else {
     Write-Host ""
-    Write-Host "Step 1 of 3 — Duplicate check skipped (repo not found in frontmatter)" -ForegroundColor Yellow
+    Write-Host "Step 1 of 3 — Duplicate check skipped (no repo in frontmatter)" -ForegroundColor Yellow
 }
 
 # ── Step 2: Publish ───────────────────────────────────────────────────────────
@@ -100,6 +77,24 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host "Step 3 of 3 — Sync notes" -ForegroundColor White
 
+# Guard: check Tools repo working tree for unrelated staged changes that would
+# be committed alongside the issue file.
+$toolsPath   = $RepoMap["Tools"].Path
+$uncommitted = git -C $toolsPath status --porcelain 2>$null |
+               Where-Object { $_ -notmatch '^\s*[?][?]' -and $_ -notmatch 'issues[\\/]' }
+
+if ($uncommitted) {
+    Write-Host "Warning: Tools repo has unrelated staged/modified files:" -ForegroundColor Yellow
+    $uncommitted | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+    Write-Host "  These would be committed alongside the issue file." -ForegroundColor Yellow
+    $confirm = Read-Host "  Continue anyway? (y/N)"
+    if ($confirm -notmatch '^[Yy]$') {
+        Write-Host "Sync cancelled. Issue was published but local file not committed." -ForegroundColor Yellow
+        Write-Host "Commit or stash your changes first, then run: .\sync-notes.ps1" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 $slug = Split-Path $File -Leaf
 & "$PSScriptRoot\sync-notes.ps1" -Message "docs: publish issue $slug"
 if ($LASTEXITCODE -ne 0) {
@@ -111,3 +106,38 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host ""
 Write-Host ("═" * 50) -ForegroundColor DarkGray
 Write-Host "Done — issue published and local file synced." -ForegroundColor Green
+
+# ── Step 4: Create PR (optional) ──────────────────────────────────────────────
+if ($CreatePR) {
+    Write-Host ""
+    Write-Host "Step 4 — Create Pull Request" -ForegroundColor White
+
+    $currentBranch = (git -C $toolsPath rev-parse --abbrev-ref HEAD 2>$null).Trim()
+    if ($currentBranch -eq "main") {
+        $branchName = "publish-issue-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        git -C $toolsPath checkout -b $branchName 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  Failed to create feature branch — PR skipped." -ForegroundColor Yellow
+            exit 0
+        }
+        Write-Host "  Created branch: $branchName" -ForegroundColor Green
+        $currentBranch = $branchName
+    }
+
+    git -C $toolsPath push --set-upstream origin $currentBranch 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  Failed to push branch — PR skipped." -ForegroundColor Yellow
+        exit 0
+    }
+
+    $prTitle = "docs: publish issue $slug"
+    $prBody  = "Publishes issue file with updated published_url.`n`nFile: $slug"
+    $prUrl   = & gh pr create --title $prTitle --body $prBody --repo "wkcollis1-eng/Tools" 2>$null
+    if ($LASTEXITCODE -eq 0 -and $prUrl) {
+        Write-Host "  Pull Request created: $prUrl" -ForegroundColor Green
+        if ($OpenInBrowser) { Start-Process $prUrl }
+    } else {
+        Write-Host "  PR creation failed — create manually:" -ForegroundColor Yellow
+        Write-Host "    gh pr create --title `"$prTitle`" --repo wkcollis1-eng/Tools" -ForegroundColor Gray
+    }
+}

@@ -1,6 +1,8 @@
 # C:\repos\Tools\publish-issue.ps1
 # Reads repo, title, and labels from a local issue file's YAML frontmatter
 # and creates the GitHub issue via gh CLI.
+# After a successful publish, writes published_url back into the frontmatter
+# as a bidirectional audit record.
 #
 # Usage:
 #   .\publish-issue.ps1 issues\ha-config_cooling-buildout.md
@@ -8,15 +10,16 @@
 
 param(
     [Parameter(Mandatory)][string]$File,
+    [string[]]$Labels    = @(),
+    [string[]]$Assignees = @(),
     [switch]$OpenInBrowser
 )
 
 . "$PSScriptRoot\common.ps1"
 Assert-Environment -RequireGh
-
 . "$PSScriptRoot\repos.ps1"
 
-# Resolve relative path from Tools root
+# Resolve relative path from tools root
 if (![System.IO.Path]::IsPathRooted($File)) {
     $File = Join-Path $PSScriptRoot $File
 }
@@ -27,31 +30,14 @@ if (!(Test-Path $File)) {
 }
 
 # ── Parse YAML frontmatter ─────────────────────────────────────────────────────
-# Frontmatter is between the first two --- lines.
-# NOTE: This parser is duplicated across publish-issue.ps1, publish-and-sync.ps1,
-# and list-issues.ps1. Future refactor: move to common.ps1 as Get-IssueFrontmatter.
-$lines = Get-Content $File
+# Uses Get-Frontmatter from common.ps1 — single authoritative parser for all
+# scripts that read issue files.
+$parsed        = Get-Frontmatter $File
+$frontmatter   = $parsed.Frontmatter
+$bodyStartLine = $parsed.BodyStartLine
+$lines         = $parsed.Lines
 
-$inFrontmatter = $false
-$frontmatter   = @{}
-$bodyStartLine = 0
-
-for ($i = 0; $i -lt $lines.Count; $i++) {
-    $line = $lines[$i].Trim()
-    if ($i -eq 0 -and $line -eq '---') {
-        $inFrontmatter = $true
-        continue
-    }
-    if ($inFrontmatter -and $line -eq '---') {
-        $bodyStartLine = $i + 1
-        break
-    }
-    if ($inFrontmatter -and $line -match '^(\w+):\s*"?(.+?)"?\s*$') {
-        $frontmatter[$Matches[1]] = $Matches[2]
-    }
-}
-
-# ── Check if already published ────────────────────────────────────────────────
+# ── Already published? ─────────────────────────────────────────────────────────
 if ($frontmatter['published_url']) {
     Write-Host "This issue has already been published: $($frontmatter['published_url'])" -ForegroundColor Yellow
     $confirm = Read-Host "Publish again anyway? (y/N)"
@@ -61,11 +47,11 @@ if ($frontmatter['published_url']) {
 # ── Validate required fields ───────────────────────────────────────────────────
 $repo   = $frontmatter['repo']
 $title  = $frontmatter['title']
-$labels = $frontmatter['labels']
+$fmLabels = $frontmatter['labels']
 
 if (!$repo -or !$title) {
     Write-Host "Frontmatter missing 'repo' or 'title' in: $File" -ForegroundColor Red
-    Write-Host "Expected format at top of file:" -ForegroundColor Yellow
+    Write-Host "Expected format:" -ForegroundColor Yellow
     Write-Host "  ---"
     Write-Host "  repo: home-assistant-config"
     Write-Host "  title: `"Your issue title`""
@@ -80,7 +66,7 @@ if ($repo -notin $Repos) {
     exit 1
 }
 
-# ── Extract body (everything after frontmatter) ────────────────────────────────
+# ── Extract body ───────────────────────────────────────────────────────────────
 $body = ($lines[$bodyStartLine..($lines.Count - 1)] | Out-String).Trim()
 
 if (!$body -or $body -match '<!--') {
@@ -89,9 +75,15 @@ if (!$body -or $body -match '<!--') {
     if ($confirm -notmatch '^[Yy]$') { exit 0 }
 }
 
-# ── Build gh command ───────────────────────────────────────────────────────────
-# Write body to a temp file and use --body-file to avoid Windows argument
-# escaping issues with backticks, code blocks, and special characters.
+# ── Combine labels: frontmatter + command-line ─────────────────────────────────
+$allLabels = @()
+if ($fmLabels) {
+    $allLabels += $fmLabels -split '[,;]\s*' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+}
+$allLabels += $Labels | Where-Object { $_ }
+
+# ── Build and run gh command ───────────────────────────────────────────────────
+# Body written to temp file to avoid Windows escaping issues with special chars.
 $bodyFile = [System.IO.Path]::GetTempFileName()
 try {
     Set-Content $bodyFile $body -Encoding UTF8
@@ -102,18 +94,12 @@ try {
         "--title",     $title,
         "--body-file", $bodyFile
     )
-
-    # Enhancement: support comma-separated label list via repeated --label args
-    if ($labels) {
-        $labelList = $labels -split ',\s*'
-        foreach ($label in $labelList) {
-            $ghArgs += @("--label", $label.Trim())
-        }
-    }
+    foreach ($label in $allLabels)  { $ghArgs += @("--label",    $label) }
+    foreach ($a     in $Assignees)  { $ghArgs += @("--assignee", $a)     }
 
     Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green
     Write-Host "  Title : $title" -ForegroundColor Cyan
-    if ($labels) { Write-Host "  Labels: $labels" -ForegroundColor Cyan }
+    if ($allLabels) { Write-Host "  Labels: $($allLabels -join ', ')" -ForegroundColor Cyan }
 
     $issueUrl = & gh @ghArgs
 
@@ -125,24 +111,20 @@ try {
     Remove-Item $bodyFile -ErrorAction SilentlyContinue
 }
 
-# Filter URL from output — gh may emit warnings alongside the URL
+# Isolate URL from any warning lines gh may emit alongside it
 $issueUrl = $issueUrl | Where-Object { $_ -match '^https://' } | Select-Object -First 1
-
 Write-Host "Created: $issueUrl" -ForegroundColor Green
 
 # ── Write published_url back to frontmatter ────────────────────────────────────
-# BUG FIX: Original regex used bare `n (LF only). Get-Content on Windows returns
-# CRLF-terminated lines, so the `n pattern never matched and the write-back was
-# silently skipped. Use `r?`n to handle both CRLF and LF line endings.
-$fileContent = Get-Content $File -Raw
-$fileContent = $fileContent -replace "(?m)^---(`r?`n(?:.*`r?`n)*?)---", "---`${1}published_url: $issueUrl`n---"
-# BUG FIX: Use TrimEnd + trailing newline instead of -NoNewline to satisfy
-# pre-commit end-of-file-fixer without creating spurious diffs.
-$fileContent = $fileContent.TrimEnd() + "`n"
+# FIX: original regex used bare `n (LF) which failed on CRLF files written on
+# Windows — Get-Content returns CRLF line endings on Windows. Changed to `r?`n
+# to match both CRLF and LF so the write-back works regardless of line endings.
+$fileContent = Get-Content $File -Raw -Encoding UTF8
+$fileContent = $fileContent -replace '(^---\r?`n(?:.*\r?`n)*?)---', "`$1published_url: $issueUrl`r`n---"
+# FIX: removed -NoNewline — causes pre-commit end-of-file-fixer to flag every commit
 Set-Content $File $fileContent -Encoding UTF8
-
 Write-Host "Updated $File with published_url" -ForegroundColor DarkGray
 
-if ($OpenInBrowser) {
+if ($OpenInBrowser -and $issueUrl) {
     Start-Process $issueUrl
 }
