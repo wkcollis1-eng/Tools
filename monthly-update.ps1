@@ -145,7 +145,7 @@ if ($Phase -eq "2") {
     # Clean working tree guard — uncommitted changes before tagging/pushing is an error
     foreach ($repo in $releaseRepos) {
         $path = "$ReposRoot\$repo"
-        if (!(Test-Path "$path\.git")) { continue }
+        if (!(Test-GitRepo $path)) { continue }
         $dirty = git -C $path status --porcelain
         if ($dirty) {
             Abort "Uncommitted changes in $repo. Commit or stash before running Phase 2."
@@ -163,22 +163,26 @@ if ($Phase -eq "2") {
 
         foreach ($repo in $releaseRepos) {
             $repoPath = "$ReposRoot\$repo"
-            if (-not (Test-Path "$repoPath\.git")) {
+            if (-not (Test-GitRepo $repoPath)) {
                 Write-Host "  Skipping $repo (not cloned locally)" -ForegroundColor Yellow
                 continue
             }
 
-            # FIX: safe int cast — git rev-list can return null/empty string if git fails
-            $lastTag      = git -C $repoPath describe --tags --abbrev=0 2>$null
+            # Count commits since the last tag to decide whether this repo needs a release.
+            # When no prior tag exists (first release), count all commits on HEAD instead
+            # of constructing a malformed "$lastTag..HEAD" range with an empty $lastTag.
+            $lastTag     = (git -C $repoPath describe --tags --abbrev=0 2>$null)
+            $lastTag     = if ($lastTag) { $lastTag.Trim() } else { $null }
             $commitsSince = if ($lastTag) {
                 git -C $repoPath rev-list "$lastTag..HEAD" --count 2>$null
             } else {
-                "1"
+                git -C $repoPath rev-list HEAD --count 2>$null
             }
-            $commitCount = [int]($commitsSince -as [int])
+            $commitCount = [int]($commitsSince.Trim() -as [int])
 
             if ($commitCount -gt 0) {
-                Write-Host "  Tagging $repo ($commitCount commit(s) since $lastTag)..." -ForegroundColor Green
+                $sinceMsg = if ($lastTag) { "$commitCount commit(s) since $lastTag" } else { "$commitCount commit(s) — first release" }
+                Write-Host "  Tagging $repo ($sinceMsg)..." -ForegroundColor Green
                 $releaseArgs = @(
                     "release", "create", $Tag,
                     "--repo", "wkcollis1-eng/$repo",
@@ -194,7 +198,8 @@ if ($Phase -eq "2") {
                     git -C $repoPath fetch --tags --quiet
                 }
             } else {
-                Write-Host "  Skipping $repo (no new commits since $lastTag)" -ForegroundColor Yellow
+                $skipMsg = if ($lastTag) { "no new commits since $lastTag" } else { "no commits found" }
+                Write-Host "  Skipping $repo ($skipMsg)" -ForegroundColor Yellow
             }
         }
     }

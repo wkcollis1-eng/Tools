@@ -101,34 +101,49 @@ foreach ($repo in $Repos) {
         git -C $path fetch origin --quiet 2>$null
     }
 
-    # FIX: Guard divergence check — rev-list --left-right errors on repos with
-    # no remote tracking branch (newly cloned, no upstream pushed yet).
-    $ahead  = 0
-    $behind = 0
-    $null   = git -C $path rev-parse --verify "origin/main" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $divRaw = git -C $path rev-list --left-right --count "origin/main...HEAD" 2>$null
-        if ($divRaw -match "^(\d+)\s+(\d+)$") {
-            $behind = [int]$Matches[1]
-            $ahead  = [int]$Matches[2]
+    # Divergence detection — guards against repos with no remote tracking branch.
+    # Detects the actual default branch name (main, master, or other) rather than
+    # assuming 'main' — avoids silently showing 0 ahead/behind on repos using 'master'.
+    $ahead      = 0
+    $behind     = 0
+    $defaultBranch = (git -C $path symbolic-ref "refs/remotes/origin/HEAD" 2>$null)
+    if ($defaultBranch) {
+        $defaultBranch = $defaultBranch.Trim() -replace '^refs/remotes/origin/', ''
+    }
+
+    if ($defaultBranch) {
+        $null = git -C $path rev-parse --verify "origin/$defaultBranch" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            # FIX: trim trailing newline before regex — without Trim() the regex
+            # "^(\d+)\s+(\d+)$" does not match and $ahead/$behind stay 0,
+            # silently missing repos that are ahead or behind origin.
+            $divRaw = (git -C $path rev-list --left-right --count "origin/$defaultBranch...HEAD" 2>$null |
+                       Out-String).Trim()
+            if ($divRaw -match "^(\d+)\s+(\d+)$") {
+                $behind = [int]$Matches[1]
+                $ahead  = [int]$Matches[2]
+            }
         }
     }
 
     $preCommitConfig  = Test-Path (Join-Path $path ".pre-commit-config.yaml")
     $preCommitHook    = Test-Path (Join-Path $path ".git\hooks\pre-commit")
 
-    if ($branch -ne "main") {
-        Warn "$repo — on branch '$branch' (expected main)"
-        Add-Result "Repos" $repo "WARN" "Wrong branch" "On '$branch', expected 'main'"
+    # Use the detected default branch for the check — avoids false WARN on repos
+    # whose default branch is 'master' or something other than 'main'.
+    $expectedBranch = if ($defaultBranch) { $defaultBranch } else { "main" }
+    if ($branch -ne $expectedBranch) {
+        Warn "$repo — on branch '$branch' (expected $expectedBranch)"
+        Add-Result "Repos" $repo "WARN" "Wrong branch" "On '$branch', expected '$expectedBranch'"
     } elseif ($dirty) {
         $count = ($dirty -split "`n" | Where-Object { $_ }).Count
         Fail "$repo — $count uncommitted change(s)"
         Add-Result "Repos" $repo "FAIL" "Dirty working tree" "$count uncommitted changes"
     } elseif ($behind -gt 0 -and $ahead -gt 0) {
-        Fail "$repo — DIVERGED ($ahead ahead, $behind behind origin/main)"
+        Fail "$repo — DIVERGED ($ahead ahead, $behind behind origin/$defaultBranch)"
         Add-Result "Repos" $repo "FAIL" "Diverged" "$ahead ahead, $behind behind"
     } elseif ($behind -gt 0) {
-        Fail "$repo — $behind commit(s) behind origin/main (run: git pull)"
+        Fail "$repo — $behind commit(s) behind origin/$defaultBranch (run: git pull)"
         Add-Result "Repos" $repo "FAIL" "Behind remote" "$behind behind"
     } elseif ($ahead -gt 0) {
         Warn "$repo — $ahead unpushed commit(s)"
@@ -140,7 +155,7 @@ foreach ($repo in $Repos) {
         Warn "$repo — pre-commit hook not installed (run: .\install-precommit-all.ps1)"
         Add-Result "Repos" $repo "WARN" "Hook not installed"
     } else {
-        Ok "$repo — clean, on main, in sync"
+        Ok "$repo — clean, on $expectedBranch, in sync"
         Add-Result "Repos" $repo "OK" "Healthy"
     }
 }

@@ -26,17 +26,24 @@ if ($LASTEXITCODE -ne 0) {
     $pipCmd = if (Get-Command pip -ErrorAction SilentlyContinue) { "pip" }
               elseif (Get-Command pip3 -ErrorAction SilentlyContinue) { "pip3" }
               else { $null }
-    if (!$pipCmd) { throw "Neither pip nor pip3 found on PATH. Install Python with pip and retry." }
+    if (!$pipCmd) {
+        Write-Host "Neither pip nor pip3 found on PATH. Install Python with pip and retry." -ForegroundColor Red
+        exit 1
+    }
 
     # No --quiet: pip errors must be visible.
     # --user: avoids permission issues on machines without admin rights.
     & $pipCmd install --user pre-commit
-    if ($LASTEXITCODE -ne 0) { throw "Failed to install pre-commit via $pipCmd." }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Failed to install pre-commit via $pipCmd." -ForegroundColor Red
+        exit 1
+    }
 
     # Verify the module is now importable
     $null = python -m pre_commit --version 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "pre-commit installed but 'python -m pre_commit' still fails. Check your Python environment."
+        Write-Host "pre-commit installed but 'python -m pre_commit' still fails. Check your Python environment." -ForegroundColor Red
+        exit 1
     }
 }
 
@@ -47,10 +54,10 @@ Write-Host "Using: $preCommitVer" -ForegroundColor DarkGray
 $installFailed = @()
 
 foreach ($repo in $Repos) {
-    $path       = "$ReposRoot\$repo"
-    $configPath = "$path\.pre-commit-config.yaml"
+    $path       = $RepoMap[$repo].Path
+    $configPath = Join-Path $path ".pre-commit-config.yaml"
 
-    if (!(Test-Path "$path\.git")) {
+    if (!(Test-GitRepo $path)) {
         Write-Host "[$repo] Not cloned — skipping" -ForegroundColor Yellow
         continue
     }

@@ -48,10 +48,16 @@ foreach ($repo in $Repos) {
     $hash     = if ($hashFull -and $hashFull.Length -ge 8) { $hashFull.Substring(0, 8) } else { "unknown" }
     $subject  = (git -C $path log -1 --pretty=format:"%s" 2>$null)
 
-    # Unpushed commit count — safe cast handles null (no upstream branch)
+    # Unpushed commit count — check for null before calling .Trim() to avoid
+    # MethodInvocationException on repos with no upstream branch configured.
     $unpushedRaw    = git -C $path rev-list "@{u}..HEAD" --count 2>$null
-    $unpushedCount  = [int]($unpushedRaw.Trim() -as [int])
-    $unpushedDisplay = if ($null -eq $unpushedRaw -or $unpushedRaw.Trim() -eq "") { "no upstream" } else { $unpushedCount }
+    if ($null -eq $unpushedRaw -or $unpushedRaw.Trim() -eq "") {
+        $unpushedCount   = 0
+        $unpushedDisplay = "no upstream"
+    } else {
+        $unpushedCount   = [int]($unpushedRaw.Trim() -as [int])
+        $unpushedDisplay = $unpushedCount
+    }
 
     # Unpushed tags — single remote call for performance
     $unpushedTags = 0
