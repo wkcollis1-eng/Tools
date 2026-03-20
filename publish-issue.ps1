@@ -1,4 +1,4 @@
-# C:\repos\tools\publish-issue.ps1
+# C:\repos\Tools\publish-issue.ps1
 # Reads repo, title, and labels from a local issue file's YAML frontmatter
 # and creates the GitHub issue via gh CLI.
 #
@@ -11,14 +11,12 @@ param(
     [switch]$OpenInBrowser
 )
 
-
-
 . "$PSScriptRoot\common.ps1"
 Assert-Environment -RequireGh
 
 . "$PSScriptRoot\repos.ps1"
 
-# Resolve relative path from tools root
+# Resolve relative path from Tools root
 if (![System.IO.Path]::IsPathRooted($File)) {
     $File = Join-Path $PSScriptRoot $File
 }
@@ -29,8 +27,9 @@ if (!(Test-Path $File)) {
 }
 
 # ── Parse YAML frontmatter ─────────────────────────────────────────────────────
-# Frontmatter is between the first two --- lines
-$raw   = Get-Content $File -Raw
+# Frontmatter is between the first two --- lines.
+# NOTE: This parser is duplicated across publish-issue.ps1, publish-and-sync.ps1,
+# and list-issues.ps1. Future refactor: move to common.ps1 as Get-IssueFrontmatter.
 $lines = Get-Content $File
 
 $inFrontmatter = $false
@@ -92,7 +91,7 @@ if (!$body -or $body -match '<!--') {
 
 # ── Build gh command ───────────────────────────────────────────────────────────
 # Write body to a temp file and use --body-file to avoid Windows argument
-# escaping issues with backticks, code blocks, and special characters in --body.
+# escaping issues with backticks, code blocks, and special characters.
 $bodyFile = [System.IO.Path]::GetTempFileName()
 try {
     Set-Content $bodyFile $body -Encoding UTF8
@@ -104,12 +103,16 @@ try {
         "--body-file", $bodyFile
     )
 
+    # Enhancement: support comma-separated label list via repeated --label args
     if ($labels) {
-        $ghArgs += @("--label", $labels)
+        $labelList = $labels -split ',\s*'
+        foreach ($label in $labelList) {
+            $ghArgs += @("--label", $label.Trim())
+        }
     }
 
     Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green
-    Write-Host "  Title: $title" -ForegroundColor Cyan
+    Write-Host "  Title : $title" -ForegroundColor Cyan
     if ($labels) { Write-Host "  Labels: $labels" -ForegroundColor Cyan }
 
     $issueUrl = & gh @ghArgs
@@ -122,13 +125,22 @@ try {
     Remove-Item $bodyFile -ErrorAction SilentlyContinue
 }
 
+# Filter URL from output — gh may emit warnings alongside the URL
+$issueUrl = $issueUrl | Where-Object { $_ -match '^https://' } | Select-Object -First 1
+
 Write-Host "Created: $issueUrl" -ForegroundColor Green
 
 # ── Write published_url back to frontmatter ────────────────────────────────────
-# Adds published_url to the frontmatter so the file serves as an audit record
+# BUG FIX: Original regex used bare `n (LF only). Get-Content on Windows returns
+# CRLF-terminated lines, so the `n pattern never matched and the write-back was
+# silently skipped. Use `r?`n to handle both CRLF and LF line endings.
 $fileContent = Get-Content $File -Raw
-$fileContent = $fileContent -replace "(^---`n(?:.*`n)*?)---", "`$1published_url: $issueUrl`n---"
-Set-Content $File $fileContent -NoNewline
+$fileContent = $fileContent -replace "(?m)^---(`r?`n(?:.*`r?`n)*?)---", "---`${1}published_url: $issueUrl`n---"
+# BUG FIX: Use TrimEnd + trailing newline instead of -NoNewline to satisfy
+# pre-commit end-of-file-fixer without creating spurious diffs.
+$fileContent = $fileContent.TrimEnd() + "`n"
+Set-Content $File $fileContent -Encoding UTF8
+
 Write-Host "Updated $File with published_url" -ForegroundColor DarkGray
 
 if ($OpenInBrowser) {

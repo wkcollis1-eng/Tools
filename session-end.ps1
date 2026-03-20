@@ -38,13 +38,43 @@ if ($Deploy) {
 } elseif ($NoDeploy) {
     Write-Host "  Skipped (-NoDeploy)" -ForegroundColor Gray
 } else {
-    # Check if any .py files changed in home-assistant-config since last push
-    $haPath     = "$ReposRoot\home-assistant-config"
-    $pyChanged  = $false
+    $haPath = $RepoMap["home-assistant-config"].Path
+    $pyChanged   = $false
+    $yamlChanged = $false
+
     if (Test-Path "$haPath\.git") {
         Set-Location $haPath
-        $pyChanged = (git diff --name-only HEAD~1 HEAD 2>$null) -match '\.py$'
+
+        # BUG FIX 1: Guard against first-commit repos that have no HEAD~1.
+        # BUG FIX 2: Use @{u}..HEAD (all unpushed commits) instead of HEAD~1..HEAD
+        #            (only the last commit) so multi-commit sessions are covered.
+        $commitCount = [int](git rev-list --count HEAD 2>$null)
+        $hasUpstream = (git rev-parse --abbrev-ref "@{u}" 2>$null) -and ($LASTEXITCODE -eq 0)
+
+        $diffRange = if ($hasUpstream) {
+            "@{u}..HEAD"
+        } elseif ($commitCount -gt 1) {
+            "HEAD~1..HEAD"
+        } else {
+            $null   # Single commit, no upstream — skip diff
+        }
+
+        if ($diffRange) {
+            $changedFiles = git diff --name-only $diffRange 2>$null
+            $pyChanged    = $changedFiles -match '\.py$'
+            $yamlChanged  = $changedFiles -match '\.(yaml|yml)$'
+        }
+
         Set-Location $PSScriptRoot
+    }
+
+    # Remind about YAML domain reloads before prompting for deploy
+    if ($yamlChanged) {
+        Write-Host ""
+        Write-Host "  ⚠  YAML changes detected in home-assistant-config." -ForegroundColor Yellow
+        Write-Host "     Remember to reload the affected HA domain after deploy" -ForegroundColor Yellow
+        Write-Host "     (Developer Tools → YAML → Reload [domain])." -ForegroundColor DarkGray
+        Write-Host ""
     }
 
     if ($pyChanged) {
@@ -64,7 +94,7 @@ if ($shouldDeploy) {
         Write-Host "Deploy failed — resolve before pushing. Session end ABORTED." -ForegroundColor Red
         exit 1
     }
-} 
+}
 
 # ── Step 3: Push all repos ────────────────────────────────────────────────────
 Write-Host ""

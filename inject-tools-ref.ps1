@@ -1,7 +1,7 @@
 # C:\repos\Tools\inject-tools-ref.ps1
 # Adds a CLAUDE_TOOLS.md reference block to each repo's CLAUDE.md.
 # Safe to re-run — skips repos where the reference already exists.
-# Run once after adding CLAUDE_TOOLS.md to the tools repo.
+# Run once after adding CLAUDE_TOOLS.md to the Tools repo.
 #
 # Usage:
 #   .\inject-tools-ref.ps1
@@ -10,11 +10,13 @@
 Assert-Environment
 . "$PSScriptRoot\repos.ps1"
 
+# Reference block appended to each CLAUDE.md.
+# Uses $ReposRoot so it adapts to -ReposRoot overrides in bootstrap.
 $toolsRef = @"
 
 ## Tools Reference
 
-See `C:\repos\Tools\CLAUDE_TOOLS.md` for the full toolkit contract (ultra-minified, Claude-optimized).
+See ``$ReposRoot\Tools\CLAUDE_TOOLS.md`` for the full toolkit contract (ultra-minified, Claude-optimized).
 Use CLAUDE_TOOLS.md as the authoritative reference during sessions — read it instead of README.md.
 
 Key commands:
@@ -28,7 +30,8 @@ $updated = 0
 $skipped = 0
 
 foreach ($repo in $Repos) {
-    if ($repo -eq "tools") { continue }  # tools repo doesn't need a self-reference
+    # "Tools" is the correct casing — skip self-reference
+    if ($repo -eq "Tools") { continue }
 
     $claudeMd = "$ReposRoot\$repo\CLAUDE.md"
 
@@ -38,16 +41,19 @@ foreach ($repo in $Repos) {
         continue
     }
 
-    $content = Get-Content $claudeMd -Raw
+    $content = Get-Content $claudeMd -Raw -Encoding UTF8
     if ($content -match "CLAUDE_TOOLS\.md") {
-        Write-Host "[$repo] Already has CLAUDE_TOOLS reference — skipping" -ForegroundColor Gray
+        Write-Host "[$repo] Already has CLAUDE_TOOLS reference — skipping" -ForegroundColor DarkGray
         $skipped++
         continue
     }
 
-    # Append at end of file
-    $content = $content.TrimEnd() + "`n" + $toolsRef + "`n"
-    Set-Content $claudeMd $content -NoNewline
+    # Append reference block with a guaranteed trailing newline.
+    # Do NOT use -NoNewline: the pre-commit end-of-file-fixer hook will create
+    # a spurious diff on every subsequent commit if the file lacks a final newline.
+    $newContent = $content.TrimEnd() + "`n" + $toolsRef.TrimEnd() + "`n"
+    Set-Content $claudeMd $newContent -Encoding UTF8
+
     Write-Host "[$repo] CLAUDE_TOOLS reference added" -ForegroundColor Green
     $updated++
 }

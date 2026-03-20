@@ -2,7 +2,7 @@
 # Full issue publishing workflow in one command:
 #   1. List open GitHub issues for the target repo (duplicate check)
 #   2. Publish the local issue file to GitHub
-#   3. Sync notes (commits the updated file with published_url back to tools repo)
+#   3. Sync notes (commits the updated file with published_url back to Tools repo)
 #
 # Usage:
 #   .\publish-and-sync.ps1 issues\ha-config_cooling-buildout.md
@@ -44,6 +44,23 @@ Write-Host ""
 Write-Host "PUBLISH ISSUE  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
 Write-Host ("═" * 50) -ForegroundColor DarkGray
 
+# ── Enhancement: Confirm Tools working tree is clean before syncing ────────────
+# Unrelated staged changes would be committed alongside the issue file in Step 3.
+Set-Location $RepoMap["Tools"].Path
+$stagedOther = git diff --cached --name-only 2>$null | Where-Object { $_ -notmatch '^issues[\\/]|^README\.md' }
+if ($stagedOther) {
+    Write-Host ""
+    Write-Host "WARNING: The following files are already staged in the Tools repo:" -ForegroundColor Yellow
+    $stagedOther | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+    Write-Host "They would be committed alongside the issue file in Step 3." -ForegroundColor Yellow
+    $clearConfirm = Read-Host "Continue anyway? (y/N)"
+    if ($clearConfirm -notmatch '^[Yy]$') {
+        Write-Host "Publish cancelled. Unstage or commit those files first." -ForegroundColor Yellow
+        exit 0
+    }
+}
+Set-Location $PSScriptRoot
+
 # ── Step 1: Duplicate check ───────────────────────────────────────────────────
 if ($SkipDuplicateCheck) {
     Write-Host ""
@@ -53,7 +70,10 @@ if ($SkipDuplicateCheck) {
     Write-Host "Step 1 of 3 — Open issues in wkcollis1-eng/$repo" -ForegroundColor White
     & "$PSScriptRoot\list-issues.ps1" -Remote -Repo $repo
     Write-Host ""
-    $confirm = Read-Host "No duplicates found? Continue to publish? (Y/n)"
+    # BUG FIX: Original prompt said "No duplicates found? Continue?" which confuses
+    # users who DID find a duplicate — they have no clear path to cancel.
+    # New prompt is neutral: review what's there, then decide.
+    $confirm = Read-Host "Review the open issues above. Publish anyway? (Y/n)"
     if ($confirm -match '^[Nn]$') {
         Write-Host "Publish cancelled." -ForegroundColor Yellow
         exit 0
@@ -81,10 +101,8 @@ Write-Host ""
 Write-Host "Step 3 of 3 — Sync notes" -ForegroundColor White
 
 $slug = Split-Path $File -Leaf
-try {
-    & "$PSScriptRoot\sync-notes.ps1" -Message "docs: publish issue $slug"
-    if ($LASTEXITCODE -ne 0) { throw "sync-notes exited $LASTEXITCODE" }
-} catch {
+& "$PSScriptRoot\sync-notes.ps1" -Message "docs: publish issue $slug"
+if ($LASTEXITCODE -ne 0) {
     Write-Host "Sync failed — issue was published but local file not committed." -ForegroundColor Yellow
     Write-Host "Run: .\sync-notes.ps1 manually to save the published_url." -ForegroundColor Yellow
     exit 1

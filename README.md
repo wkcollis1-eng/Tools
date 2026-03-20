@@ -7,7 +7,7 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 - `Residential-HVAC-Performance-Baseline-`
 - `Lifepo4-Battery-Banks`
 - `DIY-LiFePO4-UPS`
-- `tools` (this repo)
+- `Tools` (this repo)
 
 ---
 
@@ -59,7 +59,7 @@ Defines how each type of failure is handled across all scripts. New scripts must
 | **Warning** | 0 | Non-main branch, unpushed commits, python not installed | Printed in yellow. Session may proceed. |
 
 **Rules for script authors:**
-- Hard failures use `throw` or `exit 1` — never silently continue after a hard failure.
+- Hard failures use `exit 1` with a `Write-Host` error message — never `throw` in scripts called by parents (throw produces noisy or swallowed output when called from a pipeline). Reserve `throw` for strict-mode guard clauses at the top of standalone scripts only.
 - Soft failures accumulate in a `$failures` or `$results` hash and are reported in the summary.
 - Warnings never block execution.
 - Multi-repo scripts always print a summary at the end regardless of individual outcomes.
@@ -93,17 +93,17 @@ During any session, Claude Code reads `CLAUDE_TOOLS.md` as the authoritative ref
 
 Before using any script, confirm the following are installed and working on your Windows PC.
 
-### Git
+### Git (2.x required)
 ```powershell
 git --version
 ```
-If not installed: https://git-scm.com/download/win — accept all defaults.
+If not installed: https://git-scm.com/download/win — accept all defaults. Git 2.x is the minimum; `Assert-Environment` will throw with the version it detected if the requirement is not met.
 
-### Python (for pre-commit hooks)
+### Python 3.x (for pre-commit hooks)
 ```powershell
 python --version
 ```
-Required for `install-precommit-all.ps1`. Python 3.9+ is fine.
+Required for `install-precommit-all.ps1`. Python 3.x is required — `Assert-Environment -RequirePython` checks the major version and throws if it is not 3.
 
 ### GitHub CLI (`gh`) — required for `create-release.ps1`, `create-issue.ps1`, and `monthly-update.ps1`
 ```powershell
@@ -133,12 +133,14 @@ On a fresh Windows machine, download `bootstrap.ps1` from the repo and run it. I
 ```powershell
 # After installing git, python, and gh (see Prerequisites):
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-cd C:\Users\billn\OneDrive\Desktop\files
+cd <directory where you downloaded bootstrap.ps1>
 Unblock-File .\bootstrap.ps1
-.\bootstrap.ps1
+.\bootstrap.ps1                          # standard — clones to C:\repos
+.\bootstrap.ps1 -ReposRoot D:\repos      # custom repos root
+.\bootstrap.ps1 -SkipPrecommit           # skip pre-commit install step
 ```
 
-Bootstrap handles: gh authentication, git identity, execution policy, cloning all repos, unblocking scripts, and installing pre-commit hooks. Skip to Step 6 if bootstrap completed successfully.
+Bootstrap handles: git 2.x and Python 3.x version checks, gh authentication, git identity, execution policy, cloning all repos, unblocking scripts, installing pre-commit hooks, and running `verify-system.ps1` automatically at the end. It writes a `bootstrap.log` in the script directory for post-run review. Skip to Step 6 if bootstrap completed successfully.
 
 ---
 
@@ -153,7 +155,7 @@ Open PowerShell as a regular user (not administrator) and run:
 ```powershell
 mkdir C:\repos
 cd C:\repos
-git clone https://github.com/wkcollis1-eng/tools.git
+git clone https://github.com/wkcollis1-eng/Tools.git
 ```
 
 Then run the clone script to pull the other four repos:
@@ -207,31 +209,33 @@ This installs pre-commit in every repo. The hooks run automatically on every `gi
 After installing, update the hook versions to current:
 ```powershell
 cd C:\repos\home-assistant-config
-pre-commit autoupdate
+python -m pre_commit autoupdate
 git add .pre-commit-config.yaml
 git commit -m "chore: update pre-commit hook versions"
 # Repeat for each repo, or run autoupdate inside install-precommit-all.ps1
 ```
 
-> **Note:** Do not rely on the pinned versions in `.pre-commit-config.yaml` — run `pre-commit autoupdate` after initial install and again periodically.
+> **Note:** Always use `python -m pre_commit` rather than the `pre-commit` binary directly. On Windows, a freshly pip-installed `pre-commit` binary may not appear on PATH in the same PowerShell session. The module invocation always works.
 
 ---
 
 ## Scripts
 
 ### `common.ps1`
-Shared environment validation. **Never run directly** — dot-sourced automatically by every script. Defines `Assert-Environment`, which checks for required tools and git identity before any script does real work.
+Shared environment validation. **Never run directly** — dot-sourced automatically by every script. Defines `Assert-Environment`, which checks for required tools and git identity before any script does real work. Also exports the `$SambaSharePath` constant (`\\homeassistant\config\scripts`) used by `deploy-to-ha.ps1` and `verify-system.ps1`.
 
 ```powershell
 # Used inside scripts — not for direct invocation:
 . "$PSScriptRoot\common.ps1"
-Assert-Environment                          # git + git identity only
-Assert-Environment -RequireGh               # + gh CLI authenticated
-Assert-Environment -RequirePython           # + python
-Assert-Environment -RequireGh -RequirePython  # all three
+Assert-Environment                                             # git 2.x + git identity
+Assert-Environment -RequireGh                                  # + gh CLI authenticated
+Assert-Environment -RequirePython                              # + python 3.x
+Assert-Environment -RequireGh -RequirePython                   # all three
+Assert-Environment -RequirePython -RequirePreCommit            # + python -m pre_commit available
+Assert-Environment -RequirePython -RequireSamba                # + Samba share reachable
 ```
 
-Each script calls the appropriate variant. If git identity is not configured, any script that touches git will throw immediately with the exact commands to fix it.
+Each script calls the appropriate variant. If git identity is not configured, any script that touches git will throw immediately with the exact commands to fix it. `-RequirePreCommit` uses `python -m pre_commit` (not the binary) to avoid the Windows PATH-not-updated-after-pip-install problem. `-RequireSamba` calls `Test-Path $SambaSharePath` and throws if the share is not mounted.
 
 ---
 
@@ -239,13 +243,18 @@ Each script calls the appropriate variant. If git identity is not configured, an
 Single command to begin any work session. Runs `verify-system.ps1`, `pull-all-repos.ps1`, and `status-all-repos.ps1` in sequence. Aborts on any hard failure — if the environment is not clean, the session does not start.
 
 ```powershell
-.\session-start.ps1
+.\session-start.ps1           # Normal startup (pulls all repos)
+.\session-start.ps1 -NoPull  # Skip pull step (offline or air-gapped work)
 ```
+
+| Parameter | Description |
+|---|---|
+| `-NoPull` | Skip the pull step entirely — useful when working offline or on a local branch with no remote changes expected |
 
 ---
 
 ### `session-end.ps1`
-Single command to close any work session. Shows repo status, prompts for HA deploy if needed (auto-detects `.py` changes in `home-assistant-config`), pushes all repos, and syncs notes.
+Single command to close any work session. Shows repo status, prompts for HA deploy if needed (auto-detects `.py` and `.yaml` changes in `home-assistant-config`), pushes all repos, and syncs notes.
 
 ```powershell
 .\session-end.ps1              # prompts whether to deploy
@@ -262,7 +271,7 @@ Single command to close any work session. Shows repo status, prompts for HA depl
 | `-NoDeploy` | Skip deploy step entirely |
 | `-NoSync` | Skip `sync-notes.ps1` (no doc changes this session) |
 
-The deploy prompt is context-aware: if `session-end.ps1` detects `.py` file changes in `home-assistant-config` since the last commit, it defaults to **Y**. Otherwise it defaults to **N**. Pass `-Deploy` or `-NoDeploy` to skip the prompt entirely.
+The deploy prompt is context-aware: if `session-end.ps1` detects `.py` or `.yaml` file changes in `home-assistant-config` across all unpushed commits (using `@{u}..HEAD`), it defaults to **Y** for `.py` changes. If `.yaml` changes are detected, a reminder to reload the affected HA domain is shown before the prompt. Pass `-Deploy` or `-NoDeploy` to skip the prompt entirely.
 
 If deploy fails, the session end aborts before pushing — preventing a push that references scripts not yet deployed to HA.
 
@@ -289,7 +298,7 @@ Replaces the three-step manual sequence: `list-issues.ps1 -All`, `publish-issue.
 ---
 
 ### `release.ps1`
-Creates a tagged GitHub release with an automatic validation gate for the HVAC baseline repo. For `Residential-HVAC-Performance-Baseline-`, runs `validate-all.ps1` before tagging — a HALT stops the release. For all other repos, tags immediately.
+Creates a tagged GitHub release with an automatic validation gate for the HVAC baseline repo. For `Residential-HVAC-Performance-Baseline-`, runs `validate-all.ps1` before tagging — a HALT stops the release. For all other repos, tags immediately. Validates CalVer tag format before proceeding. Fetches tags locally after creation so `git describe` is immediately accurate. Auto-generates release notes from `git log --oneline` since the last tag if `-Notes` is omitted.
 
 ```powershell
 .\release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026 — cooling build-out"
@@ -302,24 +311,32 @@ Creates a tagged GitHub release with an automatic validation gate for the HVAC b
 | Parameter | Required | Description |
 |---|---|---|
 | `-Repo` | Yes | Repo name |
-| `-Tag` | Yes | CalVer tag, e.g. `v2026.03.1` |
+| `-Tag` | Yes | CalVer tag — must match `vYYYY.MM.N` (e.g. `v2026.03.1`). Script rejects malformed tags before any GitHub call |
 | `-Title` | Yes | Release title |
 | `-Month` | HVAC repo | Month to validate, e.g. `2026-03`. Required for HVAC repo to scope validation |
+| `-Notes` | No | Release body text. Auto-generated from `git log --oneline` since last tag if omitted |
 | `-Draft` | No | Create as draft for review before publishing |
 | `-SkipValidation` | No | Skip validation even for HVAC repo (use with caution) |
 
 ---
 
 ### `bootstrap.ps1`
-Full first-time setup from a fresh Windows machine. Checks prerequisites, authenticates gh, configures git identity, sets execution policy, clones all repos, unblocks scripts, and installs pre-commit hooks.
+Full first-time setup from a fresh Windows machine. Checks prerequisites (including git 2.x and Python 3.x version minimums), authenticates gh, configures git identity, sets execution policy, clones all repos, unblocks scripts, installs pre-commit hooks, and runs `verify-system.ps1` automatically at the end. Writes `bootstrap.log` in the script directory for post-run review.
 
 ```powershell
 # On a fresh machine after installing git, python, and gh:
 Unblock-File .\bootstrap.ps1
-.\bootstrap.ps1
+.\bootstrap.ps1                          # standard — clones to C:\repos
+.\bootstrap.ps1 -ReposRoot D:\repos      # custom repos root
+.\bootstrap.ps1 -SkipPrecommit           # skip pre-commit install step
 ```
 
-This is the only script that can be run before the toolkit is set up — it has no dependency on `common.ps1` or `repos.ps1` being present. After it completes, run `verify-system.ps1` to confirm everything is clean.
+| Parameter | Required | Description |
+|---|---|---|
+| `-ReposRoot` | No | Root directory for all repos. Defaults to `C:\repos` |
+| `-SkipPrecommit` | No | Skip the pre-commit install step (useful on machines without pip access) |
+
+This is the only script that can be run before the toolkit is set up — it has no dependency on `common.ps1` or `repos.ps1` being present. Both are dot-sourced automatically once the Tools repo is cloned. All steps are safe to re-run — completed steps are skipped.
 
 ---
 
@@ -337,8 +354,15 @@ Adds a `CLAUDE_TOOLS.md` reference block to each repo's `CLAUDE.md`. Safe to re-
 Full environment health check. Run at the start of any session to confirm the system is in a known-good state before doing real work. Exits 1 if any check fails.
 
 ```powershell
-.\verify-system.ps1
+.\verify-system.ps1              # Standard health check
+.\verify-system.ps1 -NoFetch    # Skip git fetch (faster, offline-safe)
+.\verify-system.ps1 -Json       # Export results to verify-results.json
 ```
+
+| Parameter | Description |
+|---|---|
+| `-NoFetch` | Skip `git fetch origin` per repo — avoids network calls when offline or when divergence data is not needed |
+| `-Json` | Export all check results to `verify-results.json` in the Tools repo root |
 
 Checks performed:
 
@@ -352,7 +376,11 @@ Checks performed:
 | All repos cloned | `.git` present in each repo directory |
 | All repos on main | No repo on a non-main branch |
 | All working trees clean | No uncommitted or unpushed changes |
+| Repo divergence | `origin/main` exists and is not diverged (guarded — skipped if no remote tracking branch) |
+| Pre-commit hooks installed | `.git/hooks/pre-commit` present per repo |
 | HA Samba share reachable | `\\homeassistant\config\scripts` accessible |
+| HA Samba share writable | Probe file write succeeds on share |
+| Deployed scripts present | Expected `.py` files exist on share |
 | Last deploy timestamp | Read from `DEPLOY_VERSION.txt` on HA share |
 
 Output is color-coded: green for pass, yellow for warnings (session can proceed), red for failures (resolve before continuing).
@@ -366,21 +394,32 @@ Single source of truth for the managed repo list. **Not run directly** — dot-s
 # repos.ps1 is sourced automatically — no manual invocation needed
 ```
 
-To add a new repo: edit `$Repos` and `$RepoUrls` in `repos.ps1`, then run `clone-all-repos.ps1`.
+To add a new repo: edit `$Repos` and `$RepoUrls` in `repos.ps1`, then run `clone-all-repos.ps1`. The unified `$RepoMap` hash (keyed by repo name, with `.Path` and `.Url` properties) is rebuilt automatically — scripts use `$RepoMap[$repo].Path` instead of constructing paths manually.
 
----
-
-### `clone-all-repos.ps1`
-Clones all repos defined in `repos.ps1` into `C:\repos\`. Safe to re-run — skips repos that already exist locally.
-
+`$ReposRoot` defaults to `C:\repos` and can be overridden by setting `$env:REPOS_ROOT` before dot-sourcing:
 ```powershell
-.\clone-all-repos.ps1
+$env:REPOS_ROOT = "D:\repos"
+. "$PSScriptRoot\repos.ps1"
 ```
 
 ---
 
+### `clone-all-repos.ps1`
+Clones all repos defined in `repos.ps1` into `C:\repos\`. Safe to re-run — skips repos that already exist locally (checks for a `.git` subdirectory, not just the directory). Shows a progress bar during cloning. After each successful clone, automatically unblocks all `.ps1` files in the cloned repo so they can run without execution policy prompts. Exits 1 if any clone fails.
+
+```powershell
+.\clone-all-repos.ps1            # standard full clone
+.\clone-all-repos.ps1 -Shallow  # --depth 1 shallow clone (faster, less history)
+```
+
+| Parameter | Description |
+|---|---|
+| `-Shallow` | Pass `--depth 1` to git clone — useful on slow connections or when full history is not needed |
+
+---
+
 ### `pull-all-repos.ps1`
-Runs `git pull` in every repo. **Run this at the start of every session** before opening Claude Code. Warns if any repo is not on `main` (does not abort — legitimate branch work is allowed). Prints a color-coded summary on completion.
+Runs `git pull --ff-only` in every repo. **Run this at the start of every session** before opening Claude Code. Uses `--ff-only` to surface diverged branches instead of silently creating merge commits. Warns if any repo is not on `main` (does not abort — legitimate branch work is allowed). Shows diff stats for updated repos. Exits 1 if any repo fails; exits 0 if all repos succeed (updated or already up to date).
 
 ```powershell
 .\pull-all-repos.ps1
@@ -389,11 +428,16 @@ Runs `git pull` in every repo. **Run this at the start of every session** before
 ---
 
 ### `status-all-repos.ps1`
-Shows current branch, unpushed commit count, and changed files for every repo. Run before committing or pushing.
+Shows current branch, last commit hash and subject, unpushed commit count, and changed files for every repo. Run before committing or pushing.
 
 ```powershell
-.\status-all-repos.ps1
+.\status-all-repos.ps1           # Full per-repo display
+.\status-all-repos.ps1 -Table   # Compact formatted table
 ```
+
+| Parameter | Description |
+|---|---|
+| `-Table` | Output a compact `Format-Table` view with one row per repo — useful for a quick glance at all repo states |
 
 ---
 
@@ -431,10 +475,10 @@ Runs `git push` in every repo. Warns if any repo is not on `main`. Reports unpus
 ---
 
 ### `sync-notes.ps1`
-Stages, commits, and pushes any text or doc changes in the `tools` repo in one command. Use this for README updates, issue drafts, and any non-code changes. Does nothing if the working tree is already clean.
+Stages, commits, and pushes `README.md` and `issues\` changes in the `Tools` repo in one command. Use this for README updates and issue drafts. **Deliberately scoped** — `.ps1` scripts and other files are never staged by this command (those belong in a proper code commit). Does nothing if neither `README.md` nor `issues\` has changes.
 
 ```powershell
-.\sync-notes.ps1                                              # default commit message
+.\sync-notes.ps1                                              # auto-generates commit message from changed files
 .\sync-notes.ps1 -Message "docs: add cooling buildout draft" # custom message
 ```
 
@@ -442,17 +486,19 @@ Stages, commits, and pushes any text or doc changes in the `tools` repo in one c
 
 | Parameter | Required | Description |
 |---|---|---|
-| `-Message` | No | Commit message. Defaults to `"docs: update notes and issue files"` |
+| `-Message` | No | Commit message. Auto-generated from changed files if omitted (e.g. `"docs: update issue draft (ha-config_sensor-fix.md)"`) |
 
-> Note: this only syncs the `tools` repo (README, issue drafts, scripts). For changes across all repos use `push-all-repos.ps1`.
+> Note: this only syncs `README.md` and `issues\` in the `Tools` repo. For code changes or changes across all repos use `push-all-repos.ps1`.
 
 ---
 
 ### `create-release.ps1`
-Creates a tagged GitHub release using the `gh` CLI. Requires `gh` to be installed and authenticated (see Prerequisites).
+Creates a tagged GitHub release using the `gh` CLI. Validates CalVer tag format before proceeding, auto-generates release notes from `git log --oneline` since the last tag if `-Notes` is omitted, and fetches the new tag back locally after creation so `git describe` is immediately accurate. Warns if used on the HVAC baseline repo and prompts for confirmation (recommending `release.ps1` instead for its HALT validation gate).
 
 ```powershell
-.\create-release.ps1 -Repo home-assistant-config -Tag v2025.06.1 -Title "June 2025 — AC cooling build-out"
+.\create-release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026 — cooling build-out"
+.\create-release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026" -Draft
+.\create-release.ps1 -Repo home-assistant-config -Tag v2026.03.1 -Title "March 2026" -Notes "Custom notes here"
 ```
 
 **Parameters:**
@@ -460,24 +506,31 @@ Creates a tagged GitHub release using the `gh` CLI. Requires `gh` to be installe
 | Parameter | Required | Description |
 |---|---|---|
 | `-Repo` | Yes | Repo name (not the full URL — just e.g. `home-assistant-config`) |
-| `-Tag` | Yes | Semantic version tag. Use CalVer format `YYYY.MM.N` consistent with your existing releases |
+| `-Tag` | Yes | CalVer tag — must match `vYYYY.MM.N` (e.g. `v2026.03.1`). Script rejects malformed tags before any GitHub call |
 | `-Title` | Yes | Release title shown on GitHub |
-| `-Notes` | No | Release body text. Defaults to prompting your editor if omitted |
+| `-Notes` | No | Release body text. Auto-generated from `git log --oneline` since last tag if omitted |
 | `-Draft` | No | Switch. Pass `-Draft` to save as draft instead of publishing immediately |
 
 **Example — draft release for review before publishing:**
 ```powershell
-.\create-release.ps1 -Repo Residential-HVAC-Performance-Baseline- -Tag v2025.06.1 -Title "June 2025 monthly update" -Draft
+.\create-release.ps1 -Repo Residential-HVAC-Performance-Baseline- -Tag v2026.03.1 -Title "March 2026 monthly update" -Draft
 ```
 
 ---
 
 ### `install-precommit-all.ps1`
-Installs pre-commit hooks in all managed repos. Run once after initial clone. Also installs `pre-commit` via pip if not present, and automatically runs `pre-commit autoupdate` in each repo so you never depend on stale pinned versions. If autoupdate modifies `.pre-commit-config.yaml`, the script prints the exact `git add` and `git commit` commands needed to save the update.
+Installs pre-commit hooks in all managed repos. Run once after initial clone. Installs `pre-commit` via `pip install --user` if not present, then runs `python -m pre_commit autoupdate` in each repo so you never depend on stale pinned versions. After install, runs `python -m pre_commit run --all-files` to confirm hooks execute correctly. If autoupdate modifies `.pre-commit-config.yaml`, the script prints the exact `git add` and `git commit` commands needed to save the update.
+
+> **Note:** All pre-commit calls use `python -m pre_commit` (not the `pre-commit` binary). On Windows, a freshly pip-installed `pre-commit` binary may not appear on PATH in the same PowerShell session. The module invocation always works.
 
 ```powershell
-.\install-precommit-all.ps1
+.\install-precommit-all.ps1              # install hooks + autoupdate
+.\install-precommit-all.ps1 -UpdateOnly  # autoupdate only, skip install
 ```
+
+| Parameter | Description |
+|---|---|
+| `-UpdateOnly` | Skip `pre-commit install` and only run `autoupdate` — useful on re-runs when hooks are already installed |
 
 ---
 
@@ -495,11 +548,11 @@ Hooks included:
 ---
 
 ### `new-issue.ps1`
-Creates a new local issue file in `tools\issues\` from the standard template. The filename is derived from the repo and a slug you provide. Edit the file, then publish it with `publish-issue.ps1`.
+Creates a new local issue file in `Tools\issues\` from the standard template. The filename is derived from the repo and a slug you provide. Edit the file, then publish it with `publish-issue.ps1`.
 
 ```powershell
 .\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout"
-.\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout" -Open   # opens in Notepad immediately
+.\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout" -Open   # auto-opens after create
 ```
 
 **Parameters:**
@@ -508,9 +561,9 @@ Creates a new local issue file in `tools\issues\` from the standard template. Th
 |---|---|---|
 | `-Repo` | Yes | Exact repo name |
 | `-Slug` | Yes | Short kebab-case description, e.g. `cooling-buildout`. Becomes part of the filename |
-| `-Open` | No | Switch. Opens the new file in Notepad immediately |
+| `-Open` | No | Switch. Opens the new file in VS Code if available, otherwise Notepad |
 
-Creates: `issues\ha-config_cooling-buildout.md` (repo prefix is derived automatically).
+Creates: `issues\ha-config_cooling-buildout.md` (repo prefix is derived automatically). Files are written with a trailing newline so the pre-commit `end-of-file-fixer` hook does not flag them on every commit.
 
 ---
 
@@ -531,6 +584,8 @@ labels: enhancement,hvac
 ---
 ```
 
+The `labels` field accepts a comma-separated list — each label is passed as a separate `--label` argument to `gh`, so all labels are applied correctly.
+
 The script validates that `repo` and `title` are present, warns if the body still contains template placeholder comments, and aborts if the repo name is not in `repos.ps1`.
 
 After a successful publish, the script writes `published_url` back into the file's frontmatter:
@@ -544,13 +599,17 @@ This creates a bidirectional trace — the local file records where it was publi
 ---
 
 ### `list-issues.ps1`
-Lists local issue drafts and/or open GitHub issues across all managed repos. Useful for reviewing what's queued locally before publishing, and for checking GitHub for duplicates.
+Lists local issue drafts and/or open GitHub issues across all managed repos. Useful for reviewing what's queued locally before publishing, and for checking GitHub for duplicates. Local drafts that have already been published show a `[published]` indicator alongside their filename.
 
 ```powershell
 .\list-issues.ps1                                        # local drafts only
 .\list-issues.ps1 -Remote                                # GitHub open issues, all repos
 .\list-issues.ps1 -Remote -Repo home-assistant-config   # one repo only
 .\list-issues.ps1 -All                                   # local drafts + GitHub issues side by side
+.\list-issues.ps1 -Remote -Label bug                     # filter GitHub issues by label
+.\list-issues.ps1 -Remote -State closed                  # show closed instead of open issues
+.\list-issues.ps1 -All -Export json                      # export all results to timestamped JSON
+.\list-issues.ps1 -All -Export csv                       # export all results to timestamped CSV
 ```
 
 **Parameters:**
@@ -558,8 +617,11 @@ Lists local issue drafts and/or open GitHub issues across all managed repos. Use
 | Parameter | Required | Description |
 |---|---|---|
 | `-Repo` | No | Filter to a single repo. Works with all modes |
-| `-Remote` | No | Switch. Fetch and display open issues from GitHub via `gh` |
+| `-Remote` | No | Switch. Fetch and display issues from GitHub via `gh` |
 | `-All` | No | Switch. Show both local drafts and GitHub issues |
+| `-Label` | No | Filter GitHub issues by label (passed as `--label` to `gh`). Also filters local drafts by label field in frontmatter |
+| `-State` | No | GitHub issue state to query — `open` (default) or `closed` |
+| `-Export` | No | Export results to a timestamped file: `json` or `csv`. Written to the Tools repo root |
 
 Remote mode requires `gh` authenticated. Color-coded by repo — same scheme as `status-all-repos.ps1`.
 
@@ -571,12 +633,13 @@ Standard template for new issue files. Copied automatically by `new-issue.ps1` �
 ---
 
 ### `create-issue.ps1`
-Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisites).
+Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisites). Displays the latest CalVer tag in the target repo for release reference context.
 
 ```powershell
 .\create-issue.ps1 -Repo home-assistant-config -Title "Fix DST in climate_norms_today.py"
 .\create-issue.ps1 -Repo Residential-HVAC-Performance-Baseline- -Title "Add March 2026 data" -OpenInBrowser
 .\create-issue.ps1 -Repo home-assistant-config -Title "Cooling build-out" -BodyFile "C:\repos\Tools\issue_body.md"
+.\create-issue.ps1 -Repo home-assistant-config -Title "Fix bug" -Labels "bug","urgent" -Assignee wkcollis1-eng
 ```
 
 **Parameters:**
@@ -587,6 +650,8 @@ Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisit
 | `-Title` | Yes | Issue title |
 | `-Body` | No | Issue body as an inline string |
 | `-BodyFile` | No | Path to a `.md` file to use as the issue body — use this for long issues like build-out plans |
+| `-Labels` | No | Array of label strings — each passed as a separate `--label` argument to `gh` (e.g. `"bug","urgent"`) |
+| `-Assignee` | No | GitHub username to assign the issue to |
 | `-OpenInBrowser` | No | Switch. Opens the new issue URL in your browser immediately |
 
 > **Note:** If neither `-Body` nor `-BodyFile` is provided, `gh` opens your configured editor so you can write the body interactively. `-BodyFile` is the recommended approach for issues that already exist as Markdown documents (e.g. `GITHUB_ISSUE_1_COOLING_BUILDOUT.md`).
@@ -594,11 +659,12 @@ Opens a GitHub issue in one of the managed repos. Requires `gh` (see Prerequisit
 ---
 
 ### `validate-all.ps1`
-Runs `validate_month.py` from the `Residential-HVAC-Performance-Baseline-` repo. Validates all months in the CSV history by default, or a specific month. **Exits 1 if any HALT-level check fails** — safe to use as a gate before committing monthly data.
+Runs `validate_month.py` from the `Residential-HVAC-Performance-Baseline-` repo. Validates all months in the CSV history by default, or a specific month. **Exits 1 if any HALT-level check fails** — safe to use as a gate before committing monthly data. The Python call is wrapped in `try/finally` so the working directory is always restored even if Python throws an uncaught exception.
 
 ```powershell
 .\validate-all.ps1                    # validate all months
 .\validate-all.ps1 -Month 2026-03     # validate March 2026 only
+.\validate-all.ps1 -Json              # also export results to validate-results.json
 ```
 
 **Parameters:**
@@ -606,6 +672,7 @@ Runs `validate_month.py` from the `Residential-HVAC-Performance-Baseline-` repo.
 | Parameter | Required | Description |
 |---|---|---|
 | `-Month` | No | Month to validate. Accepts `YYYY-MM` or `YYYY-MM-01`. Omit to validate all months |
+| `-Json` | No | Export pass/fail result and metadata to `validate-results.json` in the Tools root |
 
 **Checks run (V-HVAC-1 through V-HVAC-8):**
 - V-HVAC-1 — Runtime/HDD within ±2σ of trailing 3-month history
@@ -625,7 +692,7 @@ Output levels: `✅ PASS`, `⚠️ WARN`, `🚩 FLAG`, `🛑 HALT`. HALT stops t
 Orchestrates the full 1st-of-month data entry workflow as two distinct phases. Requires `gh`.
 
 **Phase 1 — before the Claude Code session:**
-Pulls all repos, validates existing data, and creates a work queue issue with a pre-filled checklist.
+Pulls all repos, validates the **prior month's** existing data (the target month data doesn't exist yet — this confirms the baseline is clean before new entry begins), and creates a work queue issue with a pre-filled checklist.
 
 ```powershell
 .\monthly-update.ps1 -Month 2026-03 -Phase 1
@@ -650,7 +717,7 @@ Validates the newly entered month, tags releases for repos with new commits, and
 | `-SkipRelease` | No | Switch. Skip release tagging in Phase 2 (push only) |
 | `-DraftRelease` | No | Switch. Create releases as drafts for review before publishing |
 
-Phase 2 is smart about releases — it checks `git rev-list` for each repo and only tags repos that have new commits since their last tag. Repos with no changes are skipped automatically.
+Phase 2 is smart about releases — it validates the `-Tag` format as CalVer (`vYYYY.MM.N`) before any GitHub call, checks `git rev-list` for each repo and only tags repos that have new commits since their last tag, and fetches the new tag locally after each successful create. Repos with no changes are skipped automatically.
 
 ---
 
@@ -829,22 +896,22 @@ The `.claude/settings.json` file is independent of `.pre-commit-config.yaml` and
 ## Extending the toolkit
 
 ### Adding a new Python script to deploy
-When a new `.py` script is added to `home-assistant-config\scripts\` and referenced by a shell command in `configuration.yaml`, add one entry to the `$deployMap` in `deploy-to-ha.ps1`:
+When a new `.py` script is added to `home-assistant-config\scripts\` and referenced by a shell command in `configuration.yaml`, add one entry to the `$deployMap` in `deploy-to-ha.ps1`. The map uses `$ReposRoot` (from `repos.ps1`) and `$SambaSharePath` (from `common.ps1`) so paths adapt automatically to any `-ReposRoot` override:
 
 ```powershell
 $deployMap = @{
-    "C:\repos\home-assistant-config\scripts\climate_norms_today.py" = "\\homeassistant\config\scripts\climate_norms_today.py"
-    "C:\repos\home-assistant-config\scripts\csv_manager.py"         = "\\homeassistant\config\scripts\csv_manager.py"
-    "C:\repos\home-assistant-config\scripts\setback_csv.py"         = "\\homeassistant\config\scripts\setback_csv.py"
+    "$ReposRoot\home-assistant-config\scripts\climate_norms_today.py" = "$SambaSharePath\climate_norms_today.py"
+    "$ReposRoot\home-assistant-config\scripts\csv_manager.py"         = "$SambaSharePath\csv_manager.py"
+    "$ReposRoot\home-assistant-config\scripts\setback_csv.py"         = "$SambaSharePath\setback_csv.py"
     # Add new scripts here:
-    "C:\repos\home-assistant-config\scripts\new_script.py"          = "\\homeassistant\config\scripts\new_script.py"
+    "$ReposRoot\home-assistant-config\scripts\new_script.py"          = "$SambaSharePath\new_script.py"
 }
 ```
 
 No other changes are needed.
 
 ### Adding a new repo to the toolkit
-Edit `repos.ps1` — add the repo name to `$Repos` and its clone URL to `$RepoUrls`. Every script that dot-sources `repos.ps1` will automatically include it. Then run `.\clone-all-repos.ps1` to pull it locally.
+Edit `repos.ps1` — add the repo name to `$Repos` and its clone URL to `$RepoUrls`. The `$RepoMap` (with `.Path` and `.Url` properties per repo) is rebuilt automatically. Every script that dot-sources `repos.ps1` will automatically include the new repo. Then run `.\clone-all-repos.ps1` to pull it locally.
 
 ---
 
@@ -852,7 +919,7 @@ Edit `repos.ps1` — add the repo name to `$Repos` and its clone URL to `$RepoUr
 
 ```
 C:\repos\
-├── tools\                          ← this repo
+├── Tools\                          ← this repo
 │   ├── README.md
 │   ├── repos.ps1                   ← single source of truth for repo list
 │   ├── common.ps1                  ← shared Assert-Environment, dot-sourced by all scripts
@@ -913,7 +980,7 @@ Answer `n` at the duplicate prompt to cancel, or pass `-SkipDuplicateCheck` to b
 `deploy-to-ha.ps1` failed — hash mismatch or Samba share unreachable. Do not push until resolved. Fix the deploy issue and re-run `session-end.ps1 -Deploy` to resume from the deploy step.
 
 **`session-end.ps1` deploy prompt always shows N default but I changed a .py file**
-The auto-detect looks at `git diff HEAD~1 HEAD` — if the `.py` change hasn't been committed yet it won't be detected. Commit first, then run `session-end.ps1` or pass `-Deploy` to skip detection.
+The auto-detect uses `@{u}..HEAD` to capture all unpushed commits, not just the last one. If the `.py` change hasn't been committed yet it won't be detected. Commit first, then run `session-end.ps1` or pass `-Deploy` to skip detection. If the repo has no upstream tracking branch yet, the diff falls back to `HEAD~1..HEAD` (single-commit guard).
 
 **Any script throws "Git identity not configured"**
 `Assert-Environment` in `common.ps1` checks `git config user.name` and `user.email` before proceeding. Fix with:

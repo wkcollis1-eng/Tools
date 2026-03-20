@@ -13,8 +13,8 @@ param(
     [Parameter(Mandatory)][string]$Repo,
     [Parameter(Mandatory)][string]$Tag,
     [Parameter(Mandatory)][string]$Title,
-    [string]$Month  = "",
-    [string]$Notes  = "",
+    [string]$Month          = "",
+    [string]$Notes          = "",
     [switch]$Draft,
     [switch]$SkipValidation
 )
@@ -26,6 +26,13 @@ Assert-Environment -RequireGh
 if ($Repo -notin $Repos) {
     Write-Host "Unknown repo '$Repo'. Valid options:" -ForegroundColor Red
     $Repos | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
+# BUG FIX: Validate CalVer tag format before attempting release creation.
+# Without this, a malformed tag silently creates an invalid GitHub release.
+if ($Tag -notmatch '^v\d{4}\.\d{2}\.\d+$') {
+    Write-Host "Invalid tag format '$Tag'. Expected CalVer format: vYYYY.MM.N (e.g. v2026.03.1)" -ForegroundColor Red
     exit 1
 }
 
@@ -59,7 +66,25 @@ if ($isHvacRepo -and !$SkipValidation) {
 Write-Host ""
 Write-Host "Step 2 of 3 — Create release $Tag" -ForegroundColor White
 
-$releaseNotes = if ($Notes) { $Notes } else { "$Title." }
+# Enhancement: auto-generate release notes from git log if -Notes not provided
+$repoPath = $RepoMap[$Repo].Path
+$releaseNotes = $Notes
+
+if (-not $releaseNotes -and (Test-Path "$repoPath\.git")) {
+    Set-Location $repoPath
+    $lastTag = git describe --tags --abbrev=0 HEAD^ 2>$null
+    if ($lastTag) {
+        $logLines = git log --oneline "$lastTag..HEAD" 2>$null
+        if ($logLines) {
+            $releaseNotes = "### Changes since $lastTag`n`n" + ($logLines -join "`n")
+        }
+    }
+    Set-Location $PSScriptRoot
+}
+
+if (-not $releaseNotes) {
+    $releaseNotes = "$Title."
+}
 
 $ghArgs = @(
     "release", "create", $Tag,
@@ -78,21 +103,20 @@ if ($LASTEXITCODE -ne 0) {
 $draftNote = if ($Draft) { " (draft)" } else { "" }
 Write-Host "Release $Tag created$draftNote" -ForegroundColor Green
 
-# Fetch tags locally so git describe --tags reflects the new tag immediately.
-# gh release create only writes the tag on GitHub — without this, monthly-update.ps1
-# will not find the tag until the next git fetch and will over-count commits.
-$repoPathForFetch = "$ReposRoot\$Repo"
-if (Test-Path "$repoPathForFetch\.git") {
-    Set-Location $repoPathForFetch
+# BUG FIX: gh release create writes the tag on GitHub only — without a local
+# git fetch --tags, git describe --tags returns stale results in subsequent
+# monthly-update.ps1 runs, causing incorrect commit-count calculations.
+if (Test-Path "$repoPath\.git") {
+    Set-Location $repoPath
     git fetch --tags --quiet 2>$null
     Set-Location $PSScriptRoot
+    Write-Host "Local tags updated (git fetch --tags)." -ForegroundColor DarkGray
 }
 
 # ── Step 3: Push ──────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 3 of 3 — Push $Repo" -ForegroundColor White
 
-$repoPath = "$ReposRoot\$Repo"
 if (Test-Path "$repoPath\.git") {
     Set-Location $repoPath
     git push --quiet

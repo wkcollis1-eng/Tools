@@ -1,10 +1,11 @@
-# C:\repos\tools\new-issue.ps1
-# Creates a new local issue file in tools\issues\ from the standard template.
+# C:\repos\Tools\new-issue.ps1
+# Creates a new local issue file in Tools\issues\ from the standard template.
 # Edit the file, then run publish-issue.ps1 to push it to GitHub.
 #
 # Usage:
 #   .\new-issue.ps1 -Repo home-assistant-config -Slug "cooling-buildout"
 #   .\new-issue.ps1 -Repo Residential-HVAC-Performance-Baseline- -Slug "march-2026-update"
+#   .\new-issue.ps1 -Repo home-assistant-config -Slug "sensor-fix" -Open   # auto-open after create
 
 param(
     [Parameter(Mandatory)][string]$Repo,
@@ -29,7 +30,7 @@ $repoPrefix = switch ($Repo) {
     "Residential-HVAC-Performance-Baseline-" { "hvac-baseline" }
     "Lifepo4-Battery-Banks"                  { "lifepo4" }
     "DIY-LiFePO4-UPS"                        { "ups" }
-    "tools"                                  { "tools" }
+    "Tools"                                  { "tools" }   # BUG FIX: was "tools" (lowercase key)
     default                                  { $Repo.ToLower() -replace '[^a-z0-9]', '-' }
 }
 
@@ -62,12 +63,23 @@ if ($content -match '(?m)^repo:\s*.+$') {
     Write-Host "WARNING: template does not contain a 'repo:' frontmatter line — injecting one." -ForegroundColor Yellow
     $content = $content -replace '^---', "---`nrepo: $Repo"
 }
-$content | Set-Content $outputFile -NoNewline
+
+# BUG FIX: Set-Content -NoNewline omits the trailing newline, which causes the
+# pre-commit end-of-file-fixer hook to auto-correct it on every commit, creating
+# a spurious diff. Write with a guaranteed trailing newline instead.
+$content = $content.TrimEnd() + "`n"
+Set-Content $outputFile $content -Encoding UTF8
 
 Write-Host "Created: $outputFile" -ForegroundColor Green
 Write-Host "Edit the file, then run:" -ForegroundColor Cyan
 Write-Host "  .\publish-issue.ps1 issues\${repoPrefix}_${Slug}.md" -ForegroundColor Cyan
 
 if ($Open) {
-    Start-Process notepad $outputFile
+    # Enhancement: prefer VS Code if available, fall back to Notepad
+    $vsCode = Get-Command code -ErrorAction SilentlyContinue
+    if ($vsCode) {
+        & code $outputFile
+    } else {
+        Start-Process notepad $outputFile
+    }
 }

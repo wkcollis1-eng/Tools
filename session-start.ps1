@@ -3,7 +3,12 @@
 # Runs the full pre-session sequence and stops on any hard failure.
 #
 # Usage:
-#   .\session-start.ps1
+#   .\session-start.ps1              # Normal startup (pulls all repos)
+#   .\session-start.ps1 -NoPull     # Skip pull step (offline or air-gapped work)
+
+param(
+    [switch]$NoPull
+)
 
 . "$PSScriptRoot\common.ps1"
 Assert-Environment
@@ -12,6 +17,10 @@ Assert-Environment
 Write-Host ""
 Write-Host "SESSION START  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
 Write-Host ("═" * 50) -ForegroundColor DarkGray
+
+if ($NoPull) {
+    Write-Host "  -NoPull active — pull step will be skipped." -ForegroundColor Yellow
+}
 
 # ── Step 1: Full environment health check ─────────────────────────────────────
 Write-Host ""
@@ -25,12 +34,17 @@ if ($LASTEXITCODE -ne 0) {
 
 # ── Step 2: Pull all repos ────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "Step 2 of 3 — Pull all repos" -ForegroundColor White
-& "$PSScriptRoot\pull-all-repos.ps1"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Host "Session start ABORTED — pull failed. Resolve conflicts before proceeding." -ForegroundColor Red
-    exit 1
+if ($NoPull) {
+    Write-Host "Step 2 of 3 — Pull all repos (SKIPPED — offline mode)" -ForegroundColor Yellow
+} else {
+    Write-Host "Step 2 of 3 — Pull all repos" -ForegroundColor White
+    # pull-all-repos.ps1 exits 1 if any repo fails (per-repo failure is now detected)
+    & "$PSScriptRoot\pull-all-repos.ps1"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "Session start ABORTED — pull failed. Resolve conflicts before proceeding." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # ── Step 3: Status overview ───────────────────────────────────────────────────

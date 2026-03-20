@@ -7,18 +7,18 @@
 #   .\validate-all.ps1                       # validate all months in history
 #   .\validate-all.ps1 -Month 2026-03        # validate March 2026 only
 #   .\validate-all.ps1 -Month 2026-03-01     # same (YYYY-MM-01 format also accepted)
+#   .\validate-all.ps1 -Json                 # also export results to validate-results.json
 
 param(
-    [string]$Month = ""
+    [string]$Month = "",
+    [switch]$Json
 )
-
-
 
 . "$PSScriptRoot\common.ps1"
 Assert-Environment -RequirePython
 
 . "$PSScriptRoot\repos.ps1"
-$repoPath  = "$ReposRoot\Residential-HVAC-Performance-Baseline-"
+$repoPath   = $RepoMap["Residential-HVAC-Performance-Baseline-"].Path
 $scriptPath = "$repoPath\Scripts\validate_month.py"
 
 if (-not (Test-Path $scriptPath)) {
@@ -40,27 +40,51 @@ if ($Month -ne "") {
     }
 }
 
-# Run from repo root so relative CSV paths in the script resolve correctly
-Set-Location $repoPath
+$exitCode = 0
+
+# BUG FIX: Wrap Set-Location + python call in try/finally so the working directory
+# is always restored even if Python throws an uncaught exception.
+try {
+    Set-Location $repoPath
+
+    Write-Host ""
+    if ($monthArg -ne "") {
+        Write-Host "Running validation for $monthArg..." -ForegroundColor Green
+        python Scripts\validate_month.py $monthArg
+    } else {
+        Write-Host "Running validation for all months..." -ForegroundColor Green
+        python Scripts\validate_month.py
+    }
+
+    $exitCode = $LASTEXITCODE
+} catch {
+    Write-Host "Unexpected error during validation: $_" -ForegroundColor Red
+    $exitCode = 1
+} finally {
+    # Always restore working directory — even on Python crash or Ctrl-C
+    Set-Location $PSScriptRoot
+}
 
 Write-Host ""
-if ($monthArg -ne "") {
-    Write-Host "Running validation for $monthArg..." -ForegroundColor Green
-    python Scripts\validate_month.py $monthArg
-} else {
-    Write-Host "Running validation for all months..." -ForegroundColor Green
-    python Scripts\validate_month.py
-}
-
-$exitCode = $LASTEXITCODE
-Set-Location $PSScriptRoot
 
 if ($exitCode -ne 0) {
-    Write-Host ""
     Write-Host "HALT-level failures detected. Resolve before committing." -ForegroundColor Red
-    exit 1
 } else {
-    Write-Host ""
     Write-Host "Validation complete." -ForegroundColor Cyan
-    exit 0
 }
+
+# ── Optional JSON export ───────────────────────────────────────────────────────
+if ($Json) {
+    $jsonOut = [PSCustomObject]@{
+        Timestamp = (Get-Date -Format 'o')
+        Repo      = "Residential-HVAC-Performance-Baseline-"
+        Month     = if ($monthArg) { $monthArg } else { "all" }
+        ExitCode  = $exitCode
+        Passed    = ($exitCode -eq 0)
+    }
+    $outPath = "$PSScriptRoot\validate-results.json"
+    $jsonOut | ConvertTo-Json | Set-Content $outPath -Encoding UTF8
+    Write-Host "Results exported to: $outPath" -ForegroundColor DarkGray
+}
+
+exit $exitCode
