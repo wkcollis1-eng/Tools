@@ -22,7 +22,7 @@ param(
 
 # ── Bootstrap log setup ───────────────────────────────────────────────────────
 $logFile = Join-Path $PSScriptRoot "bootstrap.log"
-function Write-Log {
+function Write-BootstrapLog {
     param([string]$Message)
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     "$ts  $Message" | Add-Content -Path $logFile
@@ -35,7 +35,7 @@ $failed    = $false
 Write-Host ""
 Write-Host "BOOTSTRAP  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -ForegroundColor Cyan
 Write-Host ("═" * 50) -ForegroundColor DarkGray
-Write-Log "Bootstrap started. ReposRoot=$ReposRoot  SkipPrecommit=$SkipPrecommit"
+Write-BootstrapLog "Bootstrap started. ReposRoot=$ReposRoot  SkipPrecommit=$SkipPrecommit"
 
 # ── Step 1: Verify prerequisites ──────────────────────────────────────────────
 # NOTE: common.ps1 does not exist yet (Tools not cloned), so checks are inline.
@@ -46,10 +46,10 @@ $missing = @()
 foreach ($cmd in @("git", "python", "gh")) {
     if (Get-Command $cmd -ErrorAction SilentlyContinue) {
         Write-Host "  OK    $cmd" -ForegroundColor Green
-        Write-Log "  prereq OK: $cmd"
+        Write-BootstrapLog "  prereq OK: $cmd"
     } else {
         Write-Host "  FAIL  $cmd not found" -ForegroundColor Red
-        Write-Log "  prereq FAIL: $cmd not found"
+        Write-BootstrapLog "  prereq FAIL: $cmd not found"
         $missing += $cmd
     }
 }
@@ -60,7 +60,7 @@ if ($missing.Count -gt 0) {
     if ($missing -contains "git")    { Write-Host "  git:    https://git-scm.com/download/win" }
     if ($missing -contains "python") { Write-Host "  python: https://python.org (check 'Add to PATH')" }
     if ($missing -contains "gh")     { Write-Host "  gh:     https://cli.github.com" }
-    Write-Log "ABORT: missing prerequisites: $($missing -join ', ')"
+    Write-BootstrapLog "ABORT: missing prerequisites: $($missing -join ', ')"
     exit 1
 }
 
@@ -70,7 +70,7 @@ $gitVerNum = $gitVerStr -replace '[^0-9.].*', ''
 if ($gitVerNum -and ([version]$gitVerNum -lt [version]"2.0")) {
     Write-Host "  FAIL  git version too old: $gitVerStr (2.x required)" -ForegroundColor Red
     Write-Host "         https://git-scm.com/download/win" -ForegroundColor Red
-    Write-Log "ABORT: git version too old: $gitVerStr"
+    Write-BootstrapLog "ABORT: git version too old: $gitVerStr"
     exit 1
 }
 Write-Host "  OK    git $gitVerStr" -ForegroundColor Green
@@ -79,7 +79,7 @@ Write-Host "  OK    git $gitVerStr" -ForegroundColor Green
 $pyMajor = python -c "import sys; print(sys.version_info.major)" 2>$null
 if ($pyMajor -ne "3") {
     Write-Host "  FAIL  Python 3.x required. Detected major version: '$pyMajor'" -ForegroundColor Red
-    Write-Log "ABORT: Python version check failed. Major=$pyMajor"
+    Write-BootstrapLog "ABORT: Python version check failed. Major=$pyMajor"
     exit 1
 }
 $pyFull = python --version 2>&1
@@ -95,12 +95,12 @@ if ($LASTEXITCODE -ne 0) {
     gh auth login
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  FAIL  gh auth login failed. Re-run bootstrap after authenticating." -ForegroundColor Red
-        Write-Log "ABORT: gh auth login failed"
+        Write-BootstrapLog "ABORT: gh auth login failed"
         exit 1
     }
 } else {
     Write-Host "  OK    gh authenticated" -ForegroundColor Green
-    Write-Log "  gh authenticated OK"
+    Write-BootstrapLog "  gh authenticated OK"
 }
 
 # ── Step 3: git identity ──────────────────────────────────────────────────────
@@ -112,7 +112,7 @@ $gitEmail = git config --global user.email 2>$null
 
 if ($gitName -and $gitEmail) {
     Write-Host "  OK    $gitName <$gitEmail>" -ForegroundColor Green
-    Write-Log "  git identity OK: $gitName <$gitEmail>"
+    Write-BootstrapLog "  git identity OK: $gitName <$gitEmail>"
 } else {
     Write-Host "  Git identity not configured." -ForegroundColor Yellow
     $name  = Read-Host "  Enter your name"
@@ -120,7 +120,7 @@ if ($gitName -and $gitEmail) {
     git config --global user.name  $name
     git config --global user.email $email
     Write-Host "  OK    $name <$email>" -ForegroundColor Green
-    Write-Log "  git identity set: $name <$email>"
+    Write-BootstrapLog "  git identity set: $name <$email>"
 }
 
 # ── Step 4: ExecutionPolicy ───────────────────────────────────────────────────
@@ -134,7 +134,7 @@ if ($policy -in @("RemoteSigned", "Unrestricted", "Bypass")) {
     Write-Host "  Setting ExecutionPolicy to RemoteSigned..." -ForegroundColor Yellow
     Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
     Write-Host "  OK    ExecutionPolicy set to RemoteSigned" -ForegroundColor Green
-    Write-Log "  ExecutionPolicy set to RemoteSigned"
+    Write-BootstrapLog "  ExecutionPolicy set to RemoteSigned"
 }
 
 # ── Step 5: Clone repos ───────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ Write-Host "Step 5 of 7 — Clone repos" -ForegroundColor White
 if (!(Test-Path $ReposRoot)) {
     New-Item -Path $ReposRoot -ItemType Directory | Out-Null
     Write-Host "  Created $ReposRoot" -ForegroundColor Green
-    Write-Log "  Created ReposRoot: $ReposRoot"
+    Write-BootstrapLog "  Created ReposRoot: $ReposRoot"
 }
 
 if (!(Test-Path "$toolsPath\.git")) {
@@ -152,10 +152,10 @@ if (!(Test-Path "$toolsPath\.git")) {
     git clone $toolsUrl $toolsPath
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  FAIL  Failed to clone Tools repo." -ForegroundColor Red
-        Write-Log "ABORT: Tools clone failed"
+        Write-BootstrapLog "ABORT: Tools clone failed"
         exit 1
     }
-    Write-Log "  Tools repo cloned OK"
+    Write-BootstrapLog "  Tools repo cloned OK"
 } else {
     Write-Host "  OK    Tools repo already cloned" -ForegroundColor Green
 }
@@ -172,14 +172,14 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "  WARNING: one or more repos failed to clone (see above)." -ForegroundColor Yellow
     Write-Host "           Re-run .\clone-all-repos.ps1 after resolving." -ForegroundColor Yellow
-    Write-Log "  WARNING: clone-all-repos exited $LASTEXITCODE — some repos may be missing"
+    Write-BootstrapLog "  WARNING: clone-all-repos exited $LASTEXITCODE — some repos may be missing"
     # Soft failure — continue bootstrap so pre-commit and verify can still run
 }
 
 # Now that common.ps1 is available, dot-source it for use by subsequent callers
 if (Test-Path "$toolsPath\common.ps1") {
     . "$toolsPath\common.ps1"
-    Write-Log "  common.ps1 loaded (v$CommonVersion)"
+    Write-BootstrapLog "  common.ps1 loaded (v$CommonVersion)"
 }
 
 # ── Step 6: Install pre-commit hooks ─────────────────────────────────────────
@@ -188,7 +188,7 @@ Write-Host "Step 6 of 7 — Install pre-commit hooks" -ForegroundColor White
 
 if ($SkipPrecommit) {
     Write-Host "  SKIP  -SkipPrecommit specified." -ForegroundColor DarkGray
-    Write-Log "  Step 6 skipped (-SkipPrecommit)"
+    Write-BootstrapLog "  Step 6 skipped (-SkipPrecommit)"
 } else {
     $hooksAlreadyInstalled = Test-Path "$toolsPath\.git\hooks\pre-commit"
     if ($hooksAlreadyInstalled) {
@@ -198,11 +198,11 @@ if ($SkipPrecommit) {
         try {
             & "$toolsPath\install-precommit-all.ps1"
             if ($LASTEXITCODE -ne 0) { throw "install-precommit-all exited $LASTEXITCODE" }
-            Write-Log "  pre-commit hooks installed OK"
+            Write-BootstrapLog "  pre-commit hooks installed OK"
         } catch {
             Write-Host "  WARNING: pre-commit hook installation failed: $_" -ForegroundColor Yellow
             Write-Host "           Run .\install-precommit-all.ps1 manually to retry." -ForegroundColor Yellow
-            Write-Log "  WARNING: pre-commit install failed: $_"
+            Write-BootstrapLog "  WARNING: pre-commit install failed: $_"
             # Soft failure — pre-commit can be installed later
         }
     }
@@ -218,10 +218,10 @@ if (Test-Path $verifyScript) {
     & $verifyScript
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  WARNING: verify-system reported issues (see above)." -ForegroundColor Yellow
-        Write-Log "  verify-system exited $LASTEXITCODE — review output above"
+        Write-BootstrapLog "  verify-system exited $LASTEXITCODE — review output above"
         $failed = $true
     } else {
-        Write-Log "  verify-system passed"
+        Write-BootstrapLog "  verify-system passed"
     }
 } else {
     Write-Host "  SKIP  verify-system.ps1 not found (run manually after session-start)." -ForegroundColor DarkGray
@@ -233,12 +233,12 @@ Write-Host ("═" * 50) -ForegroundColor DarkGray
 
 if ($failed) {
     Write-Host "Bootstrap completed with warnings — review output above." -ForegroundColor Yellow
-    Write-Log "Bootstrap completed WITH WARNINGS"
+    Write-BootstrapLog "Bootstrap completed WITH WARNINGS"
     Write-Host "  Log: $logFile" -ForegroundColor Gray
     exit 1
 } else {
     Write-Host "Bootstrap complete. Ready to work:" -ForegroundColor Green
-    Write-Log "Bootstrap completed successfully"
+    Write-BootstrapLog "Bootstrap completed successfully"
     Write-Host ""
     Write-Host "  cd $toolsPath" -ForegroundColor Cyan
     Write-Host "  .\session-start.ps1" -ForegroundColor Cyan
