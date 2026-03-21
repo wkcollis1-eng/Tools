@@ -4,21 +4,18 @@ on:
   push:
   pull_request:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   lint:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
       # ── Step 1: PS AST syntax check ───────────────────────────────────────────
       - name: Syntax check -- PS AST parser
         shell: pwsh
         run: |
-          $errors = @()
+          $syntaxErrors = @()
           Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
             $parseErrors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -26,20 +23,31 @@ jobs:
             )
             if ($parseErrors -and $parseErrors.Count -gt 0) {
               $parseErrors | ForEach-Object {
-                $errors += "$($_.Extent.File):$($_.Extent.StartLineNumber) -- $($_.Message)"
+                $syntaxErrors += "$($_.Extent.File):$($_.Extent.StartLineNumber) -- $($_.Message)"
               }
             }
           }
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+          if ($syntaxErrors.Count -gt 0) {
+            $syntaxErrors | ForEach-Object { Write-Host $_ -ForegroundColor Red }
             exit 1
           }
           Write-Host "All PS1 files passed syntax check." -ForegroundColor Green
 
-      # ── Step 2: Install PSScriptAnalyzer ─────────────────────────────────────
-      - name: Install PSScriptAnalyzer
+      # ── Step 2: Cache PSScriptAnalyzer ───────────────────────────────────────
+      - name: Cache PSScriptAnalyzer
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\PowerShell\Modules\PSScriptAnalyzer
+          key: ${{ runner.os }}-psmodule-psscriptanalyzer
+
+      - name: Install PSScriptAnalyzer if not cached
         shell: pwsh
-        run: Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+        run: |
+          if (!(Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+          } else {
+            Write-Host "PSScriptAnalyzer already cached." -ForegroundColor DarkGray
+          }
 
       # ── Step 3: PSScriptAnalyzer -- standard rules ────────────────────────────
       - name: PSScriptAnalyzer -- standard rules
@@ -75,8 +83,8 @@ jobs:
           Write-Host "PSScriptAnalyzer standard rules passed." -ForegroundColor Green
 
       # ── Step 4: PSScriptAnalyzer -- security rules ────────────────────────────
-      # Checks for plaintext credentials, Invoke-Expression, and other security
-      # anti-patterns. Runs separately so findings are clearly categorised.
+      # Checks for credentials, Invoke-Expression, empty catch blocks,
+      # cmdlet aliases, and other security/reliability anti-patterns.
       - name: PSScriptAnalyzer -- security rules
         shell: pwsh
         run: |
@@ -84,7 +92,9 @@ jobs:
             'PSAvoidUsingConvertToSecureStringWithPlainText',
             'PSAvoidUsingUsernameAndPasswordParams',
             'PSAvoidUsingPlainTextForPassword',
-            'PSAvoidUsingInvokeExpression'
+            'PSAvoidUsingInvokeExpression',
+            'PSAvoidUsingEmptyCatchBlock',
+            'PSAvoidUsingCmdletAliases'
           )
 
           $results = Invoke-ScriptAnalyzer -Path . -Recurse `
@@ -103,9 +113,9 @@ jobs:
           Write-Host "Security rules passed." -ForegroundColor Green
 
       # ── Step 5: CLAUDE_TOOLS.md cross-reference ───────────────────────────────
-      # Confirms every .ps1 script in the repo root is referenced in CLAUDE_TOOLS.md.
-      # Catches documentation drift when new scripts are added without updating the
-      # Claude Code reference file.
+      # Confirms every .ps1 in the repo root is referenced in CLAUDE_TOOLS.md.
+      # Catches documentation drift when new scripts are added without updating
+      # the Claude Code reference file.
       - name: CLAUDE_TOOLS.md cross-reference
         shell: pwsh
         run: |
@@ -116,9 +126,9 @@ jobs:
 
           $toolsContent = Get-Content CLAUDE_TOOLS.md -Raw
 
-          # Scripts that are intentionally omitted from CLAUDE_TOOLS.md
+          # Scripts intentionally omitted from CLAUDE_TOOLS.md
           $exempt = @(
-            'push-tools-to-github.ps1'   # deprecated
+            'push-tools-to-github.ps1'   # deprecated -- retained for historical reference only
           )
 
           $missing = @()
@@ -134,7 +144,8 @@ jobs:
             Write-Host "Scripts not referenced in CLAUDE_TOOLS.md:" -ForegroundColor Yellow
             $missing | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
             Write-Host ""
-            Write-Host "Add these scripts to CLAUDE_TOOLS.md or add them to the exempt list in lint.yml." -ForegroundColor Gray
+            Write-Host "Add these to CLAUDE_TOOLS.md or to the exempt list in lint.yml." -ForegroundColor Gray
             exit 1
           }
-          Write-Host "CLAUDE_TOOLS.md cross-reference passed ($((Get-ChildItem -Filter *.ps1).Count - $exempt.Count) scripts checked)." -ForegroundColor Green
+          $checked = (Get-ChildItem -Filter *.ps1).Count - $exempt.Count
+          Write-Host "CLAUDE_TOOLS.md cross-reference passed ($checked scripts checked)." -ForegroundColor Green
