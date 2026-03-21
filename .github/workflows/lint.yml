@@ -12,9 +12,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v6
 
-      - name: Syntax check — PS AST parser
+      - name: Syntax check -- PS AST parser
         shell: pwsh
         run: |
           $errors = @()
@@ -45,10 +45,12 @@ jobs:
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error `
             -ExcludeRule PSAvoidUsingWriteHost
           if ($results) {
-            Write-Host "PSScriptAnalyzer findings:" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "PSScriptAnalyzer findings ($($results.Count) total):" -ForegroundColor Yellow
             $results | ForEach-Object {
-              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line): $($_.RuleName)" -ForegroundColor Yellow
-              Write-Host "    $($_.Message)" -ForegroundColor Gray
+              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line)" -ForegroundColor Yellow
+              Write-Host "    Rule   : $($_.RuleName)" -ForegroundColor Gray
+              Write-Host "    Message: $($_.Message)" -ForegroundColor Gray
             }
             exit 1
           }
