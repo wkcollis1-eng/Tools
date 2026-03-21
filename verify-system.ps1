@@ -175,7 +175,11 @@ if (Test-Path $SambaSharePath) {
         "test" | Set-Content $testFile -ErrorAction Stop
         Remove-Item $testFile -ErrorAction Stop
         $writable = $true
-    } catch { }
+    } catch {
+        # Share is reachable but read-only — not an error, just report WARN below
+        $writable = $false
+        Write-Verbose "Samba write probe failed: $_"
+    }
 
     # Deployed scripts present?
     $missingScripts = $deployedScripts | Where-Object { !(Test-Path (Join-Path $SambaSharePath $_)) }
