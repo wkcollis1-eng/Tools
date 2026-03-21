@@ -42,8 +42,23 @@ jobs:
       - name: PSScriptAnalyzer
         shell: pwsh
         run: |
+          $exclude = @(
+            # BOM is optional for UTF-8 and causes issues on Linux/macOS runners.
+            # All toolkit scripts are UTF-8 without BOM by convention.
+            'PSUseBOMForUnicodeEncodedFile',
+
+            # Write-Host is used intentionally throughout for colored console output.
+            'PSAvoidUsingWriteHost',
+
+            # $CommonVersion and $SambaSharePath in common.ps1 are intentionally
+            # exported via dot-sourcing -- PSScriptAnalyzer cannot see cross-script
+            # usage so flags them as unused. They are not unused.
+            'PSUseDeclaredVarsMoreThanAssignments'
+          )
+
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error `
-            -ExcludeRule PSAvoidUsingWriteHost
+            -ExcludeRule $exclude
+
           if ($results) {
             Write-Host ""
             Write-Host "PSScriptAnalyzer findings ($($results.Count) total):" -ForegroundColor Yellow
