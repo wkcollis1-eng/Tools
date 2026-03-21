@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # ── Step 1: PS AST syntax check ───────────────────────────────────────────
       - name: Syntax check -- PS AST parser
         shell: pwsh
         run: |
@@ -35,11 +36,13 @@ jobs:
           }
           Write-Host "All PS1 files passed syntax check." -ForegroundColor Green
 
+      # ── Step 2: Install PSScriptAnalyzer ─────────────────────────────────────
       - name: Install PSScriptAnalyzer
         shell: pwsh
         run: Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
 
-      - name: PSScriptAnalyzer
+      # ── Step 3: PSScriptAnalyzer -- standard rules ────────────────────────────
+      - name: PSScriptAnalyzer -- standard rules
         shell: pwsh
         run: |
           $exclude = @(
@@ -51,8 +54,8 @@ jobs:
             'PSAvoidUsingWriteHost',
 
             # $CommonVersion and $SambaSharePath in common.ps1 are intentionally
-            # exported via dot-sourcing -- PSScriptAnalyzer cannot see cross-script
-            # usage so flags them as unused. They are not unused.
+            # exported via dot-sourcing -- PSScriptAnalyzer cannot trace cross-script
+            # usage and flags them as unused. They are not unused.
             'PSUseDeclaredVarsMoreThanAssignments'
           )
 
@@ -69,4 +72,69 @@ jobs:
             }
             exit 1
           }
-          Write-Host "PSScriptAnalyzer passed." -ForegroundColor Green
+          Write-Host "PSScriptAnalyzer standard rules passed." -ForegroundColor Green
+
+      # ── Step 4: PSScriptAnalyzer -- security rules ────────────────────────────
+      # Checks for plaintext credentials, Invoke-Expression, and other security
+      # anti-patterns. Runs separately so findings are clearly categorised.
+      - name: PSScriptAnalyzer -- security rules
+        shell: pwsh
+        run: |
+          $securityRules = @(
+            'PSAvoidUsingConvertToSecureStringWithPlainText',
+            'PSAvoidUsingUsernameAndPasswordParams',
+            'PSAvoidUsingPlainTextForPassword',
+            'PSAvoidUsingInvokeExpression'
+          )
+
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse `
+            -IncludeRule $securityRules
+
+          if ($results) {
+            Write-Host ""
+            Write-Host "Security rule findings ($($results.Count) total):" -ForegroundColor Red
+            $results | ForEach-Object {
+              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line)" -ForegroundColor Red
+              Write-Host "    Rule   : $($_.RuleName)" -ForegroundColor Gray
+              Write-Host "    Message: $($_.Message)" -ForegroundColor Gray
+            }
+            exit 1
+          }
+          Write-Host "Security rules passed." -ForegroundColor Green
+
+      # ── Step 5: CLAUDE_TOOLS.md cross-reference ───────────────────────────────
+      # Confirms every .ps1 script in the repo root is referenced in CLAUDE_TOOLS.md.
+      # Catches documentation drift when new scripts are added without updating the
+      # Claude Code reference file.
+      - name: CLAUDE_TOOLS.md cross-reference
+        shell: pwsh
+        run: |
+          if (!(Test-Path "CLAUDE_TOOLS.md")) {
+            Write-Host "CLAUDE_TOOLS.md not found -- skipping cross-reference check." -ForegroundColor Yellow
+            exit 0
+          }
+
+          $toolsContent = Get-Content CLAUDE_TOOLS.md -Raw
+
+          # Scripts that are intentionally omitted from CLAUDE_TOOLS.md
+          $exempt = @(
+            'push-tools-to-github.ps1'   # deprecated
+          )
+
+          $missing = @()
+          Get-ChildItem -Filter *.ps1 | ForEach-Object {
+            if ($_.Name -in $exempt) { return }
+            if ($toolsContent -notmatch [regex]::Escape($_.Name)) {
+              $missing += $_.Name
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Host ""
+            Write-Host "Scripts not referenced in CLAUDE_TOOLS.md:" -ForegroundColor Yellow
+            $missing | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
+            Write-Host ""
+            Write-Host "Add these scripts to CLAUDE_TOOLS.md or add them to the exempt list in lint.yml." -ForegroundColor Gray
+            exit 1
+          }
+          Write-Host "CLAUDE_TOOLS.md cross-reference passed ($((Get-ChildItem -Filter *.ps1).Count - $exempt.Count) scripts checked)." -ForegroundColor Green
