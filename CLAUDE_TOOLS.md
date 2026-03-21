@@ -9,28 +9,35 @@
 |---|---|
 | start | `.\session-start.ps1` |
 | end | `.\session-end.ps1` |
+| status | `.\status-all-repos.ps1 [-Table]` |
 | publish issue | `.\publish-and-sync.ps1 issues\<file>` |
+| publish only | `.\publish-issue.ps1 issues\<file>` |
 | release | `.\release.ps1 -Repo X -Tag vY -Title Z` |
+| create release | `.\create-release.ps1 -Repo X -Tag vY -Title Z` |
 | monthly | `.\monthly-update.ps1 -Month YYYY-MM -Phase 1\|2` |
 | deploy | `.\deploy-to-ha.ps1` |
 | validate | `.\validate-all.ps1 [-Month YYYY-MM]` |
 | new issue | `.\new-issue.ps1 -Repo X -Slug Y` |
+| create issue | `.\create-issue.ps1 -Repo X -Title Y` |
 | list issues | `.\list-issues.ps1 [-Remote] [-All]` |
 | verify | `.\verify-system.ps1` |
 | pull | `.\pull-all-repos.ps1` |
 | push | `.\push-all-repos.ps1` |
 | sync docs | `.\sync-notes.ps1` |
+| inject tools ref | `.\inject-tools-ref.ps1` |
 | add repo | edit `repos.ps1` → `clone-all-repos.ps1` |
-| add HA script | edit `$deployMap` |
+| add HA script | edit `$deployMap` in `deploy-to-ha.ps1` |
 | bootstrap | `.\bootstrap.ps1` |
+| pre-commit hooks | `.\install-precommit-all.ps1 [-UpdateOnly]` |
 
 ---
 
 ## Scope
 
-Repos: `home-assistant-config` · `Residential-HVAC-Performance-Baseline-` · `Lifepo4-Battery-Banks` · `DIY-LiFePO4-UPS` · `tools`
+Repos: `home-assistant-config` · `Residential-HVAC-Performance-Baseline-` · `Lifepo4-Battery-Banks` · `DIY-LiFePO4-UPS` · `Tools`
 Root: `C:\repos\`
 **Repo list: `repos.ps1` only**
+**Shared infrastructure: `common.ps1`** (dot-sourced by all scripts — never run directly)
 
 ---
 
@@ -126,13 +133,15 @@ HALT surfaces immediately
 
 ## Environment
 
-All scripts:
+All scripts dot-source `common.ps1` and call `Assert-Environment` before doing real work:
 
 ```powershell
-Assert-Environment [-RequireGh] [-RequirePython]
+Assert-Environment [-RequireGh] [-RequirePython] [-RequirePreCommit] [-RequireSamba]
 ```
 
-Checks: git + identity · gh + auth · python
+Checks: git 2.x + identity · gh + auth · python 3.x · pre-commit module · Samba share
+Shared functions: `Test-GitRepo $path` · `Get-Frontmatter $file`
+Shared constants: `$SambaSharePath`
 
 ---
 
