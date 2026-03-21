@@ -21,20 +21,26 @@ jobs:
       - name: PS AST syntax check
         shell: pwsh
         run: |
-          $syntaxErrors = @()
+          $hasErrors = $false
+
           Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
             $parseErrors = $null
             $null = [System.Management.Automation.Language.Parser]::ParseFile(
               $_.FullName, [ref]$null, [ref]$parseErrors
             )
+
             if ($parseErrors -and $parseErrors.Count -gt 0) {
+              $hasErrors = $true
               $parseErrors | ForEach-Object {
-                $syntaxErrors += "$($_.Extent.File):$($_.Extent.StartLineNumber) -- $($_.Message)"
+                # Normalise path separators — GitHub annotations require forward slashes
+                $relativePath = (Resolve-Path -Relative $_.Extent.File).TrimStart('.\').Replace('\', '/')
+                Write-Output "::error file=$relativePath,line=$($_.Extent.StartLineNumber),title=Syntax Error::$($_.Message)"
               }
             }
           }
-          if ($syntaxErrors.Count -gt 0) {
-            $syntaxErrors | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+
+          if ($hasErrors) {
+            Write-Output "::error::Syntax check failed. See annotations for details."
             exit 1
           }
           Write-Host "All PS1 files passed syntax check." -ForegroundColor Green
@@ -60,6 +66,8 @@ jobs:
         shell: pwsh
         run: |
           if (!(Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            # Trust PSGallery first to prevent interactive prompts hanging the runner
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
             Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Force -Scope CurrentUser -Repository PSGallery
           } else {
             Write-Host "PSScriptAnalyzer 1.22.0 already cached." -ForegroundColor DarkGray
@@ -87,12 +95,12 @@ jobs:
             -ExcludeRule $exclude
 
           if ($results) {
-            Write-Host ""
             Write-Host "PSScriptAnalyzer findings ($($results.Count) total):" -ForegroundColor Yellow
             $results | ForEach-Object {
-              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line)" -ForegroundColor Yellow
-              Write-Host "    Rule   : $($_.RuleName)" -ForegroundColor Gray
-              Write-Host "    Message: $($_.Message)" -ForegroundColor Gray
+              # Normalise path separators for GitHub annotations
+              $relativePath = (Resolve-Path -Relative $_.ScriptPath).TrimStart('.\').Replace('\', '/')
+              $severity = if ($_.Severity -eq 'Error') { 'error' } else { 'warning' }
+              Write-Output "::$severity file=$relativePath,line=$($_.Line),title=$($_.RuleName)::$($_.Message)"
             }
             exit 1
           }
@@ -115,18 +123,18 @@ jobs:
             -IncludeRule $securityRules
 
           if ($results) {
-            Write-Host ""
             Write-Host "Security rule findings ($($results.Count) total):" -ForegroundColor Red
             $results | ForEach-Object {
-              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line)" -ForegroundColor Red
-              Write-Host "    Rule   : $($_.RuleName)" -ForegroundColor Gray
-              Write-Host "    Message: $($_.Message)" -ForegroundColor Gray
+              $relativePath = (Resolve-Path -Relative $_.ScriptPath).TrimStart('.\').Replace('\', '/')
+              Write-Output "::error file=$relativePath,line=$($_.Line),title=Security - $($_.RuleName)::$($_.Message)"
             }
             exit 1
           }
           Write-Host "Security rules passed." -ForegroundColor Green
 
       # ── CLAUDE_TOOLS.md cross-reference ───────────────────────────────────────
+      # Confirms every .ps1 in the repo root is referenced in CLAUDE_TOOLS.md.
+      # Uses word boundaries (\b) to prevent partial name matches.
       - name: CLAUDE_TOOLS.md cross-reference
         shell: pwsh
         run: |
@@ -141,21 +149,22 @@ jobs:
             'push-tools-to-github.ps1'   # deprecated -- retained for historical reference only
           )
 
-          $missing = @()
+          $missing = [System.Collections.Generic.List[string]]::new()
+
           Get-ChildItem -Filter *.ps1 | ForEach-Object {
             if ($_.Name -in $exempt) { return }
-            if ($toolsContent -notmatch [regex]::Escape($_.Name)) {
-              $missing += $_.Name
+            # Word boundaries prevent partial matches (e.g. update.ps1 vs force-update.ps1)
+            if ($toolsContent -notmatch "\b$([regex]::Escape($_.Name))\b") {
+              $missing.Add($_.Name)
             }
           }
 
           if ($missing.Count -gt 0) {
-            Write-Host ""
-            Write-Host "Scripts not referenced in CLAUDE_TOOLS.md:" -ForegroundColor Yellow
+            Write-Output "::error title=Missing Documentation::Scripts not referenced in CLAUDE_TOOLS.md"
             $missing | ForEach-Object { Write-Host "  $_" -ForegroundColor Yellow }
-            Write-Host ""
             Write-Host "Add these to CLAUDE_TOOLS.md or to the exempt list in lint.yml." -ForegroundColor Gray
             exit 1
           }
+
           $checked = (Get-ChildItem -Filter *.ps1).Count - $exempt.Count
           Write-Host "CLAUDE_TOOLS.md cross-reference passed ($checked scripts checked)." -ForegroundColor Green
