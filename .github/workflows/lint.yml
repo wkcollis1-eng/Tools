@@ -3,16 +3,22 @@ name: PS lint
 on:
   push:
   pull_request:
+  schedule:
+    - cron: '0 9 1 * *'   # 1st of each month — catches PSGallery rule changes
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
+  syntax:
+    name: Syntax check
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      # ── Step 1: PS AST syntax check ───────────────────────────────────────────
-      - name: Syntax check -- PS AST parser
+      - name: PS AST syntax check
         shell: pwsh
         run: |
           $syntaxErrors = @()
@@ -33,23 +39,33 @@ jobs:
           }
           Write-Host "All PS1 files passed syntax check." -ForegroundColor Green
 
-      # ── Step 2: Cache PSScriptAnalyzer ───────────────────────────────────────
+  analyze:
+    name: PSScriptAnalyzer + cross-reference
+    runs-on: windows-latest
+    needs: syntax   # only runs if syntax check passes
+
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      # ── Cache PSScriptAnalyzer ────────────────────────────────────────────────
+      # Version pinned so a PSGallery update never silently changes pass/fail behavior.
+      # Cache key includes version — a version bump automatically invalidates the cache.
       - name: Cache PSScriptAnalyzer
         uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules\PSScriptAnalyzer
-          key: ${{ runner.os }}-psmodule-psscriptanalyzer
+          key: ${{ runner.os }}-psmodule-psscriptanalyzer-1.22.0
 
       - name: Install PSScriptAnalyzer if not cached
         shell: pwsh
         run: |
           if (!(Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-            Install-Module PSScriptAnalyzer -Force -Scope CurrentUser -Repository PSGallery
+            Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Force -Scope CurrentUser -Repository PSGallery
           } else {
-            Write-Host "PSScriptAnalyzer already cached." -ForegroundColor DarkGray
+            Write-Host "PSScriptAnalyzer 1.22.0 already cached." -ForegroundColor DarkGray
           }
 
-      # ── Step 3: PSScriptAnalyzer -- standard rules ────────────────────────────
+      # ── Standard rules ────────────────────────────────────────────────────────
       - name: PSScriptAnalyzer -- standard rules
         shell: pwsh
         run: |
@@ -82,9 +98,7 @@ jobs:
           }
           Write-Host "PSScriptAnalyzer standard rules passed." -ForegroundColor Green
 
-      # ── Step 4: PSScriptAnalyzer -- security rules ────────────────────────────
-      # Checks for credentials, Invoke-Expression, empty catch blocks,
-      # cmdlet aliases, and other security/reliability anti-patterns.
+      # ── Security rules ────────────────────────────────────────────────────────
       - name: PSScriptAnalyzer -- security rules
         shell: pwsh
         run: |
@@ -112,21 +126,17 @@ jobs:
           }
           Write-Host "Security rules passed." -ForegroundColor Green
 
-      # ── Step 5: CLAUDE_TOOLS.md cross-reference ───────────────────────────────
-      # Confirms every .ps1 in the repo root is referenced in CLAUDE_TOOLS.md.
-      # Catches documentation drift when new scripts are added without updating
-      # the Claude Code reference file.
+      # ── CLAUDE_TOOLS.md cross-reference ───────────────────────────────────────
       - name: CLAUDE_TOOLS.md cross-reference
         shell: pwsh
         run: |
           if (!(Test-Path "CLAUDE_TOOLS.md")) {
-            Write-Host "CLAUDE_TOOLS.md not found -- skipping cross-reference check." -ForegroundColor Yellow
+            Write-Host "CLAUDE_TOOLS.md not found -- skipping." -ForegroundColor Yellow
             exit 0
           }
 
           $toolsContent = Get-Content CLAUDE_TOOLS.md -Raw
 
-          # Scripts intentionally omitted from CLAUDE_TOOLS.md
           $exempt = @(
             'push-tools-to-github.ps1'   # deprecated -- retained for historical reference only
           )
