@@ -10,6 +10,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read   # least-privilege — no write access needed for linting
+
 jobs:
   syntax:
     name: Syntax check
@@ -43,7 +46,9 @@ jobs:
             Write-Output "::error::Syntax check failed. See annotations for details."
             exit 1
           }
+
           Write-Host "All PS1 files passed syntax check." -ForegroundColor Green
+          "✅ Syntax check passed" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
   analyze:
     name: PSScriptAnalyzer + cross-reference
@@ -56,11 +61,12 @@ jobs:
       # ── Cache PSScriptAnalyzer ────────────────────────────────────────────────
       # Version pinned so a PSGallery update never silently changes pass/fail behavior.
       # Cache key includes version — a version bump automatically invalidates the cache.
+      # To pin to a SHA: grab the commit hash from https://github.com/actions/cache/releases
       - name: Cache PSScriptAnalyzer
         uses: actions/cache@v4
         with:
           path: ~\Documents\PowerShell\Modules\PSScriptAnalyzer
-          key: ${{ runner.os }}-psmodule-psscriptanalyzer-1.22.0
+          key: ${{ runner.os }}-psmodule-psscriptanalyzer-1.25.0
 
       - name: Install PSScriptAnalyzer if not cached
         shell: pwsh
@@ -68,43 +74,33 @@ jobs:
           if (!(Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
             # Trust PSGallery first to prevent interactive prompts hanging the runner
             Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-            Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Force -Scope CurrentUser -Repository PSGallery
+            Install-Module PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser -Repository PSGallery
           } else {
-            Write-Host "PSScriptAnalyzer 1.22.0 already cached." -ForegroundColor DarkGray
+            Write-Host "PSScriptAnalyzer 1.25.0 already cached." -ForegroundColor DarkGray
           }
 
       # ── Standard rules ────────────────────────────────────────────────────────
+      # Rule exclusions are defined in PSScriptAnalyzerSettings.psd1 in the repo root.
+      # That file is also picked up by VS Code + PowerShell extension for local linting
+      # so local and CI rules stay identical.
       - name: PSScriptAnalyzer -- standard rules
         shell: pwsh
         run: |
-          $exclude = @(
-            # BOM is optional for UTF-8 and causes issues on Linux/macOS runners.
-            # All toolkit scripts are UTF-8 without BOM by convention.
-            'PSUseBOMForUnicodeEncodedFile',
-
-            # Write-Host is used intentionally throughout for colored console output.
-            'PSAvoidUsingWriteHost',
-
-            # $CommonVersion and $SambaSharePath in common.ps1 are intentionally
-            # exported via dot-sourcing -- PSScriptAnalyzer cannot trace cross-script
-            # usage and flags them as unused. They are not unused.
-            'PSUseDeclaredVarsMoreThanAssignments'
-          )
-
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error `
-            -ExcludeRule $exclude
+            -Settings ./PSScriptAnalyzerSettings.psd1
 
           if ($results) {
             Write-Host "PSScriptAnalyzer findings ($($results.Count) total):" -ForegroundColor Yellow
             $results | ForEach-Object {
-              # Normalise path separators for GitHub annotations
               $relativePath = (Resolve-Path -Relative $_.ScriptPath).TrimStart('.\').Replace('\', '/')
               $severity = if ($_.Severity -eq 'Error') { 'error' } else { 'warning' }
               Write-Output "::$severity file=$relativePath,line=$($_.Line),title=$($_.RuleName)::$($_.Message)"
             }
             exit 1
           }
+
           Write-Host "PSScriptAnalyzer standard rules passed." -ForegroundColor Green
+          "✅ PSScriptAnalyzer standard rules passed" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       # ── Security rules ────────────────────────────────────────────────────────
       - name: PSScriptAnalyzer -- security rules
@@ -130,7 +126,9 @@ jobs:
             }
             exit 1
           }
+
           Write-Host "Security rules passed." -ForegroundColor Green
+          "✅ Security rules passed" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
       # ── CLAUDE_TOOLS.md cross-reference ───────────────────────────────────────
       # Confirms every .ps1 in the repo root is referenced in CLAUDE_TOOLS.md.
@@ -168,3 +166,4 @@ jobs:
 
           $checked = (Get-ChildItem -Filter *.ps1).Count - $exempt.Count
           Write-Host "CLAUDE_TOOLS.md cross-reference passed ($checked scripts checked)." -ForegroundColor Green
+          "✅ CLAUDE_TOOLS.md cross-reference passed ($checked scripts checked)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
