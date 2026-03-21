@@ -35,7 +35,7 @@ function Get-RepoColor($r) {
     }
 }
 
-function Parse-Frontmatter($filePath) {
+function ConvertFrom-Frontmatter($filePath) {
     $lines = Get-Content $filePath -Encoding UTF8
     $inFM  = $false
     $meta  = @{ repo = ""; title = ""; labels = ""; published_url = "" }
@@ -64,7 +64,7 @@ if (!$Remote -or $All) {
     } else {
         $files = Get-ChildItem "$issuesDir\*.md" | Where-Object { $_.Name -ne "TEMPLATE.md" }
         if ($Repo) {
-            $files = $files | Where-Object { (Parse-Frontmatter $_.FullName)['repo'] -eq $Repo }
+            $files = $files | Where-Object { (ConvertFrom-Frontmatter $_.FullName)['repo'] -eq $Repo }
         }
 
         if (!$files) {
@@ -72,7 +72,7 @@ if (!$Remote -or $All) {
         } else {
             $localCount = 0
             foreach ($file in $files | Sort-Object Name) {
-                $meta     = Parse-Frontmatter $file.FullName
+                $meta     = ConvertFrom-Frontmatter $file.FullName
                 $repoVal  = if ($meta['repo'])   { $meta['repo'] }   else { "(no repo)" }
                 $titleVal = if ($meta['title'])  { $meta['title'] }  else { "(no title)" }
                 $labVal   = if ($meta['labels']) { $meta['labels'] } else { "" }

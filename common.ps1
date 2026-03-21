@@ -18,7 +18,8 @@
 #   if (!(Test-GitRepo $path)) { ... }
 #   $parsed = Get-Frontmatter "issues\foo.md"
 #
-# Version stamp — increment when this file changes
+# Version stamp — increment when this file changes.
+# $CommonVersion is intentionally exported via dot-sourcing for consumers to read.
 $CommonVersion = "1.3.0"
 
 # Samba share path used by deploy-to-ha.ps1 and verify-system.ps1
