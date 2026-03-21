@@ -4,12 +4,15 @@ on:
   push:
   pull_request:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   lint:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Syntax check — PS AST parser
         shell: pwsh
@@ -22,7 +25,7 @@ jobs:
             )
             if ($parseErrors -and $parseErrors.Count -gt 0) {
               $parseErrors | ForEach-Object {
-                $errors += "$($_.Extent.File):$($_.Extent.StartLineNumber) — $($_.Message)"
+                $errors += "$($_.Extent.File):$($_.Extent.StartLineNumber) -- $($_.Message)"
               }
             }
           }
@@ -42,7 +45,11 @@ jobs:
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Severity Warning,Error `
             -ExcludeRule PSAvoidUsingWriteHost
           if ($results) {
-            $results | Format-Table RuleName, Severity, ScriptName, Line, Message -AutoSize
+            Write-Host "PSScriptAnalyzer findings:" -ForegroundColor Yellow
+            $results | ForEach-Object {
+              Write-Host "  [$($_.Severity)] $($_.ScriptName) line $($_.Line): $($_.RuleName)" -ForegroundColor Yellow
+              Write-Host "    $($_.Message)" -ForegroundColor Gray
+            }
             exit 1
           }
           Write-Host "PSScriptAnalyzer passed." -ForegroundColor Green
