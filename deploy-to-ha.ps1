@@ -1,39 +1,47 @@
-# C:\repos\Tools\deploy-to-ha.ps1
+﻿# C:\repos\Tools\deploy-to-ha.ps1
 # Copies live Python scripts to the HA Green Samba share.
 # Run after any commit that modifies a script file in home-assistant-config\scripts\.
 #
-# Three scripts are deployed — all are called by shell commands in configuration.yaml:
-#   climate_norms_today.py  — shell_command: climate_norms_today
-#   csv_manager.py          — appenddailycsv, appendmonthlycsv, rotatedailycsv, backup_input_numbers
-#   setback_csv.py          — appendsetbacklog_1f, appendsetbacklog_2f
+# Three scripts are deployed -- all are called by shell commands in configuration.yaml:
+#   climate_norms_today.py  -- shell_command: climate_norms_today
+#   csv_manager.py          -- appenddailycsv, appendmonthlycsv, rotatedailycsv, backup_input_numbers
+#   setback_csv.py          -- appendsetbacklog_1f, appendsetbacklog_2f
 #
-# After running: Developer Tools → YAML → Reload Shell Commands
+# After running: Developer Tools -> YAML -> Reload Shell Commands
+
+param(
+    [string]$SambaOverride = ""
+)
 
 . "$PSScriptRoot\common.ps1"
-Assert-Environment -RequireSamba      # verifies Samba share is reachable before proceeding
+if (-not $SambaOverride) {
+    Assert-Environment -RequireSamba      # verifies Samba share is reachable before proceeding
+}
 
 . "$PSScriptRoot\repos.ps1"
 
-# ── Deploy map: source (local) → destination (Samba share) ────────────────────
-# Uses $ReposRoot from repos.ps1 and $SambaSharePath from common.ps1 —
+$targetBase = if ($SambaOverride) { $SambaOverride } else { $SambaSharePath }
+
+# -- Deploy map: source (local) -> destination (Samba share) --------------------
+# Uses $ReposRoot from repos.ps1 and $targetBase (overridden or $SambaSharePath) --
 # no hardcoded paths so the map adapts to -ReposRoot overrides.
 $deployMap = @{
-    "$ReposRoot\home-assistant-config\scripts\climate_norms_today.py" = "$SambaSharePath\climate_norms_today.py"
-    "$ReposRoot\home-assistant-config\scripts\csv_manager.py"         = "$SambaSharePath\csv_manager.py"
-    "$ReposRoot\home-assistant-config\scripts\setback_csv.py"         = "$SambaSharePath\setback_csv.py"
-    # Add new scripts here — no other changes needed
+    "$ReposRoot\home-assistant-config\scripts\climate_norms_today.py" = "$targetBase\climate_norms_today.py"
+    "$ReposRoot\home-assistant-config\scripts\csv_manager.py"         = "$targetBase\csv_manager.py"
+    "$ReposRoot\home-assistant-config\scripts\setback_csv.py"         = "$targetBase\setback_csv.py"
+    # Add new scripts here â€” no other changes needed
 }
 
-# ── Pre-flight: verify all source files exist before touching the share ────────
+# -- Pre-flight: verify all source files exist before touching the share --------
 $missingFiles = $deployMap.Keys | Where-Object { !(Test-Path $_) }
 if ($missingFiles) {
-    Write-Host "ABORTED — missing source file(s):" -ForegroundColor Red
+    Write-Host "ABORTED -- missing source file(s):" -ForegroundColor Red
     $missingFiles | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
     Write-Host "Pull the repo first: .\pull-all-repos.ps1" -ForegroundColor Yellow
     exit 1
 }
 
-# ── Helper: copy with 1 retry on Samba transient failures ─────────────────────
+# -- Helper: copy with 1 retry on Samba transient failures ---------------------
 function Copy-WithRetry {
     param(
         [string]$Source,
@@ -45,7 +53,7 @@ function Copy-WithRetry {
         return $true
     } catch {
         $err1 = $_
-        Write-Host "    Copy failed ($err1) — retrying in ${RetryDelaySec}s..." -ForegroundColor Yellow
+        Write-Host "    Copy failed ($err1) -- retrying in ${RetryDelaySec}s..." -ForegroundColor Yellow
         Start-Sleep -Seconds $RetryDelaySec
         try {
             Copy-Item $Source $Destination -Force -ErrorAction Stop
@@ -57,7 +65,7 @@ function Copy-WithRetry {
     }
 }
 
-# ── Deploy with hash verification ─────────────────────────────────────────────
+# -- Deploy with hash verification ---------------------------------------------
 $deployed = 0
 $failed   = 0
 
@@ -72,7 +80,7 @@ foreach ($src in $deployMap.Keys) {
         continue
     }
 
-    # Hash verification — catches partial writes over Samba
+    # Hash verification -- catches partial writes over Samba
     $srcHash = (Get-FileHash $src -Algorithm SHA256).Hash
     $dstHash = (Get-FileHash $dst -Algorithm SHA256).Hash
 
@@ -93,7 +101,7 @@ if ($failed -gt 0) {
     exit 1
 }
 
-# ── Write deploy record to HA share ───────────────────────────────────────────
+# -- Write deploy record to HA share -----------------------------------------------
 # Always written on success so verify-system.ps1 can detect stale deployments.
 $commitHash = git -C "$ReposRoot\home-assistant-config" rev-parse --short HEAD 2>$null
 if (!$commitHash) { $commitHash = "unknown" }
@@ -101,12 +109,12 @@ $timestamp  = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $version    = "$timestamp | $deployed script(s) | home-assistant-config@$commitHash"
 
 try {
-    Set-Content "$SambaSharePath\DEPLOY_VERSION.txt" $version -ErrorAction Stop
+    Set-Content "$targetBase\DEPLOY_VERSION.txt" $version -ErrorAction Stop
 } catch {
-    Write-Host "Warning: could not write DEPLOY_VERSION.txt — $_" -ForegroundColor Yellow
+    Write-Host "Warning: could not write DEPLOY_VERSION.txt -- $_" -ForegroundColor Yellow
     Write-Host "Scripts deployed successfully but deploy record was not updated." -ForegroundColor Yellow
 }
 
 Write-Host "$deployed script(s) deployed and verified." -ForegroundColor Cyan
 Write-Host "Deploy record: $version" -ForegroundColor DarkGray
-Write-Host "Next: Developer Tools → YAML → Reload Shell Commands" -ForegroundColor Yellow
+Write-Host "Next: Developer Tools -> YAML -> Reload Shell Commands" -ForegroundColor Yellow
