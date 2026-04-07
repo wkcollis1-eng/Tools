@@ -172,13 +172,13 @@ if (Test-Path $SambaSharePath) {
     $testFile = Join-Path $SambaSharePath ".verify_$(Get-Random).tmp"
     $writable = $false
     try {
-        "test" | Set-Content $testFile -ErrorAction Stop
+        [System.IO.File]::WriteAllText($testFile, "verify")
         Remove-Item $testFile -ErrorAction Stop
         $writable = $true
     } catch {
         # Share is reachable but read-only -- not an error, just report WARN below
         $writable = $false
-        Write-Verbose "Samba write probe failed: $_"
+        Write-Host "  Samba write probe failed: $($_.Exception.Message)" -ForegroundColor Gray
     }
 
     # Deployed scripts present?
