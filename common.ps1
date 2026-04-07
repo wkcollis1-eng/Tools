@@ -23,7 +23,7 @@
 $CommonVersion = "1.3.0"
 
 # Samba share path used by deploy-to-ha.ps1 and verify-system.ps1
-$SambaSharePath = "\\homeassistant\config\scripts"
+$SambaSharePath = "H:\scripts" # Mapped drive for \\homeassistant\config\scripts
 
 function Assert-Environment {
     param(
