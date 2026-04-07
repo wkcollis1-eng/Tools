@@ -63,9 +63,14 @@ foreach ($repo in $Repos) {
     }
 
     if (!(Test-Path $configPath)) {
-        Write-Host "[$repo] No .pre-commit-config.yaml — skipping" -ForegroundColor Yellow
-        Write-Host "       Copy $ReposRoot\Tools\.pre-commit-config.yaml to $path to enable hooks." -ForegroundColor Gray
-        continue
+        $masterConfig = Join-Path $PSScriptRoot ".pre-commit-config.yaml"
+        if (Test-Path $masterConfig) {
+            Write-Host "[$repo] No .pre-commit-config.yaml - distributing from Tools..." -ForegroundColor Cyan
+            Copy-Item $masterConfig $configPath -Force
+        } else {
+            Write-Host "[$repo] No .pre-commit-config.yaml and no master copy found in Tools - skipping" -ForegroundColor Yellow
+            continue
+        }
     }
 
     Push-Location $path

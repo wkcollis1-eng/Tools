@@ -55,7 +55,7 @@ Root: `C:\repos\`
 
 | Type | Exit | Behavior |
 |---|---|---|
-| Hard | 1 | immediate abort |
+| Hard | 1 | Write-Host Red + exit 1 (no throw) |
 | Soft | 0 | log + continue + summarize |
 | Warn | 0 | informational |
 
@@ -139,7 +139,7 @@ All scripts dot-source `common.ps1` and call `Assert-Environment` before doing r
 Assert-Environment [-RequireGh] [-RequirePython] [-RequirePreCommit] [-RequireSamba]
 ```
 
-Checks: git 2.x + identity · gh + auth · python 3.x · pre-commit module · Samba share
+Checks: git 2.x + identity · gh + auth · python 3.x (PYTHONUTF8=1 for validation) · pre-commit module · Samba share
 Shared functions: `Test-GitRepo $path` · `Get-Frontmatter $file`
 Shared constants: `$SambaSharePath`
 

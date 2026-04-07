@@ -94,7 +94,15 @@ try {
         "--title",     $title,
         "--body-file", $bodyFile
     )
-    foreach ($label in $allLabels)  { $ghArgs += @("--label",    $label) }
+    foreach ($label in $allLabels) {
+        # Only add labels that exist on the remote to avoid gh CLI crashes
+        $exists = (gh label list --repo "wkcollis1-eng/$repo" | Select-String -Pattern "^$label\s" -SimpleMatch)
+        if ($exists) {
+            $ghArgs += @("--label", $label)
+        } else {
+            Write-Host "  Warning: Label '$label' not found on remote. Skipping." -ForegroundColor Yellow
+        }
+    }
     foreach ($a     in $Assignees)  { $ghArgs += @("--assignee", $a)     }
 
     Write-Host "Publishing issue to wkcollis1-eng/$repo..." -ForegroundColor Green

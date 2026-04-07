@@ -15,6 +15,8 @@ param(
     [switch]$Json
 )
 
+$env:PYTHONUTF8 = 1
+
 . "$PSScriptRoot\common.ps1"
 Assert-Environment -RequirePython
 . "$PSScriptRoot\repos.ps1"
