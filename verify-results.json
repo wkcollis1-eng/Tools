@@ -1,0 +1,92 @@
+﻿{
+    "Summary":  {
+                    "Total":  10,
+                    "Warnings":  1,
+                    "Failed":  4,
+                    "Passed":  5
+                },
+    "Timestamp":  "2026-04-07T19:12:53Z",
+    "NoFetch":  false,
+    "Results":  [
+                    {
+                        "Status":  "OK",
+                        "Message":  "git version 2.53.0.windows.1 (Claude Code \u003cclaude@anthropic.com\u003e)",
+                        "Details":  "",
+                        "Timestamp":  "2026-04-07T19:12:51Z",
+                        "Category":  "Tools",
+                        "Item":  "git"
+                    },
+                    {
+                        "Status":  "OK",
+                        "Message":  "gh version 2.85.0 (2026-01-14)",
+                        "Details":  "",
+                        "Timestamp":  "2026-04-07T19:12:51Z",
+                        "Category":  "Tools",
+                        "Item":  "gh"
+                    },
+                    {
+                        "Status":  "OK",
+                        "Message":  "Python 3.14.3",
+                        "Details":  "",
+                        "Timestamp":  "2026-04-07T19:12:51Z",
+                        "Category":  "Tools",
+                        "Item":  "python"
+                    },
+                    {
+                        "Status":  "OK",
+                        "Message":  "Healthy",
+                        "Details":  "",
+                        "Timestamp":  "2026-04-07T19:12:51Z",
+                        "Category":  "Repos",
+                        "Item":  "DIY-LiFePO4-UPS"
+                    },
+                    {
+                        "Status":  "FAIL",
+                        "Message":  "Dirty working tree",
+                        "Details":  "1 uncommitted changes",
+                        "Timestamp":  "2026-04-07T19:12:52Z",
+                        "Category":  "Repos",
+                        "Item":  "Lifepo4-Battery-Banks"
+                    },
+                    {
+                        "Status":  "FAIL",
+                        "Message":  "Dirty working tree",
+                        "Details":  "1 uncommitted changes",
+                        "Timestamp":  "2026-04-07T19:12:52Z",
+                        "Category":  "Repos",
+                        "Item":  "Residential-HVAC-Performance-Baseline-"
+                    },
+                    {
+                        "Status":  "FAIL",
+                        "Message":  "Dirty working tree",
+                        "Details":  "1 uncommitted changes",
+                        "Timestamp":  "2026-04-07T19:12:52Z",
+                        "Category":  "Repos",
+                        "Item":  "home-assistant-config"
+                    },
+                    {
+                        "Status":  "FAIL",
+                        "Message":  "Dirty working tree",
+                        "Details":  "1 uncommitted changes",
+                        "Timestamp":  "2026-04-07T19:12:53Z",
+                        "Category":  "Repos",
+                        "Item":  "Tools"
+                    },
+                    {
+                        "Status":  "WARN",
+                        "Message":  "Read-only",
+                        "Details":  "(no deploy record)",
+                        "Timestamp":  "2026-04-07T19:12:53Z",
+                        "Category":  "HA Green",
+                        "Item":  "Samba Share"
+                    },
+                    {
+                        "Status":  "OK",
+                        "Message":  "All present",
+                        "Details":  "",
+                        "Timestamp":  "2026-04-07T19:12:53Z",
+                        "Category":  "HA Green",
+                        "Item":  "Deployed Scripts"
+                    }
+                ]
+}

@@ -1,0 +1,70 @@
+Monthly Update Workflow – Session Summary (2026-04-09)
+Overview
+Overhauled the data pipeline for HVAC & utility monthly updates.
+Now automatically pulls billing data from Home Assistant REST API, writes to three separate CSV files, and handles missing data gracefully.
+
+🔧 Script Changes
+monthly-update.ps1
+Billing data now written to three separate files under Residential-HVAC-Performance-Baseline-/data/:
+
+monthly_gas_scg.csv (columns: month, ccf)
+
+monthly_electricity_eversource.csv (columns: month, kwh, amount)
+
+monthly_dhw_navien.csv (columns: month, ccf)
+
+Date format standardized to YYYY-MM-01 (e.g., 2026-03-01) for all month columns.
+
+Handles missing HA data – always appends a row for the prior month; missing values become empty cells.
+Phase 1 does not abort on missing data; Phase 2 aborts if validation fails.
+
+Auto‑migration of old CSV formats (e.g., Bill_Date, Read_Date, Month/Gas_CCF) to the new schema.
+
+Entity naming now matches 3‑letter month abbreviations (e.g., input_number.gas_archive_feb_ccf).
+
+Phase 1 validation changed to warn only (no HALT).
+Phase 2 validation remains a strict gate (aborts on failure).
+
+validate_month.py
+Updated to read from the new CSV file locations and column names (month, ccf, kwh, amount).
+
+Backward‑compatible with old column names (Month, Gas_CCF, etc.).
+
+Removed Bill_Date mapping – gas consumption month is now taken directly from the month column.
+
+📁 Data Migration
+Existing CSV files were automatically migrated on first run of the new script:
+
+Old file	Old columns	New columns
+monthly_gas_scg.csv	Bill_Date, Gas_CCF	month, ccf
+monthly_electricity_eversource.csv	Read_Date, Usage_kWh, Charge	month, kwh, amount
+monthly_dhw_navien.csv	Month, Gas_CCF	month, ccf
+All historical rows were converted to YYYY-MM-01 format, with consumption month estimated as bill date minus ~15 days.
+
+🔁 Workflow Reminder
+Run Phase 1 with the next month as argument:
+.\monthly-update.ps1 -Month 2026-04 -Phase 1
+→ pulls data for March 2026.
+
+Run Claude Code session to fill any missing values.
+
+Run Phase 2 with a tag:
+.\monthly-update.ps1 -Month 2026-04 -Phase 2 -Tag v2026.04.1
+
+No manual date entry for each utility – the script automatically computes the prior month.
+
+⚠️ Known Issues Fixed
+✅ CSV append errors due to mismatched headers – resolved with auto‑migration.
+
+✅ Unicode garbage characters – fixed by setting chcp 65001.
+
+✅ Missing directories – script now creates data/ folder automatically.
+
+✅ Duplicate rows – prevented by checking month column before appending.
+
+📌 Next Steps
+Keep HA input numbers updated each month (gas, electric, DHW).
+
+Run Phase 1 on/after the 1st of each month (or when data is ready).
+
+Commit migrated CSV files to git after verifying a few months.
