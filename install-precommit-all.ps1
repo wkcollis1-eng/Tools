@@ -73,6 +73,19 @@ foreach ($repo in $Repos) {
         }
     }
 
+    # The gitleaks rule file must travel WITH the config. Without it the hook
+    # falls back to stock rules, and those were measured against the 2026
+    # credential leak: they caught the API key and missed the Wi-Fi PSK and the
+    # OTA password. A scanner that passes on the very secrets that leaked is
+    # worse than no scanner, because it reads as an all-clear.
+    #
+    # Always overwritten, unlike the config above which is only seeded when
+    # absent: this is a shared rule set, not a per-repo preference.
+    $masterLeaks = Join-Path $PSScriptRoot ".gitleaks.toml"
+    if (Test-Path $masterLeaks) {
+        Copy-Item $masterLeaks (Join-Path $path ".gitleaks.toml") -Force
+    }
+
     Push-Location $path
     try {
         if (!$UpdateOnly) {
@@ -88,11 +101,11 @@ foreach ($repo in $Repos) {
         python -m pre_commit autoupdate
 
         # If autoupdate changed the config, prompt the user to commit it
-        $changed = git status --short .pre-commit-config.yaml 2>$null
+        $changed = git status --short .pre-commit-config.yaml .gitleaks.toml 2>$null
         if ($changed) {
             Write-Host "[$repo] Hook versions updated — commit the change:" -ForegroundColor Yellow
             Write-Host "       cd $path" -ForegroundColor Gray
-            Write-Host "       git add .pre-commit-config.yaml" -ForegroundColor Gray
+            Write-Host "       git add .pre-commit-config.yaml .gitleaks.toml" -ForegroundColor Gray
             Write-Host "       git commit -m 'chore: update pre-commit hook versions'" -ForegroundColor Gray
         }
 
