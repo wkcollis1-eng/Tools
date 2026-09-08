@@ -1,5 +1,7 @@
 # tools
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories and Home Assistant Green deployment from a Windows PC.
 
 **Repos managed:**
@@ -1048,3 +1050,11 @@ The hook command must write to stdout for Claude Code to capture it. `validate_m
 
 **`git pull` reports merge conflicts**
 Do not force-push. Resolve conflicts manually in the affected file, then `git add` and `git commit`. If Claude Code made the conflicting commit, check CLAUDE.md for the session rules that govern how it handles existing content.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+Copyright (c) 2026 William K. Collis
