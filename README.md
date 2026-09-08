@@ -9,6 +9,7 @@ PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories an
 - `Residential-HVAC-Performance-Baseline-`
 - `Lifepo4-Battery-Banks`
 - `DIY-LiFePO4-UPS`
+- `mmwave-presence-node`
 - `Tools` (this repo)
 
 ---

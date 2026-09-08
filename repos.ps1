@@ -23,6 +23,7 @@ $Repos = @(
     "Lifepo4-Battery-Banks",
     "Residential-HVAC-Performance-Baseline-",
     "home-assistant-config",
+    "mmwave-presence-node",
     "Tools"
 )
 
@@ -45,6 +46,10 @@ $RepoMap = @{
     "home-assistant-config" = @{
         Path = "$ReposRoot\home-assistant-config"
         Url  = "https://github.com/wkcollis1-eng/home-assistant-config.git"
+    }
+    "mmwave-presence-node" = @{
+        Path = "$ReposRoot\mmwave-presence-node"
+        Url  = "https://github.com/wkcollis1-eng/mmwave-presence-node.git"
     }
     "Tools" = @{
         Path = "$ReposRoot\Tools"
