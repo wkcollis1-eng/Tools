@@ -34,3 +34,11 @@ def outer(text):
             "these tools give both layers one thickness"
         )
     return um["F.Cu"] * 1e-6, f"stackup, F.Cu and B.Cu {um['F.Cu']:g} um"
+
+
+def thickness(text, t_um=None):
+    """(thickness in m, the line a tool prints first): t_um (the tool's --t-um) if given, else outer(text).
+
+    ValueError as outer(). One copy of that line, so every tool states its copper the same way."""
+    t, why = (t_um * 1e-6, "--t-um") if t_um is not None else outer(text)
+    return t, f"copper {t * 1e6:g} um: {why}"

@@ -242,7 +242,45 @@ CASES = [
         [],
         [],
     ),
-    ("netdrop toc_1100", [["RUN", "netdrop", T1100, "--h", "0.1"]], [], []),
+    (
+        "netdrop toc_1100",
+        [["RUN", "netdrop", T1100, "--h", "0.1"]],
+        [],
+        [(CU_STACK % {"t": 35}, True)],
+    ),
+    (
+        "netdrop toc_1100 t-um 70",
+        [["RUN", "netdrop", T1100, "--h", "0.1", "--t-um", "70"]],
+        [],
+        [(r"^copper 70 um: --t-um$", True)],
+    ),
+    (
+        "netdrop fault copper 70",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_STACK % {"t": 70}, True)],
+    ),
+    (
+        "netdrop fault copper mixed",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_MIXED, True), (r" mohm   h=", False)],
+    ),
+    (
+        "netdrop fault copper none",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_NONE, True)],
+    ),
     (
         "netdrop self-test",
         [["RUN", "netdrop", "--self-test"]],

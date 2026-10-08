@@ -1,0 +1,14 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: 35,70
+-- stderr
+
+== step 2: RUN netdrop exit 2
+-- stdout
+
+-- stderr
+usage: netdrop.py [-h] [--h H] [--contact {pad,drill}] [--net [NET ...]]
+                  [--t-um T_UM] [--self-test]
+                  [board]
+netdrop.py: error: copper: F.Cu 35 um and B.Cu 70 um differ; these tools give both layers one thickness; give --t-um
+== files

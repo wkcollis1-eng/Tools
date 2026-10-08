@@ -1,0 +1,11 @@
+== step 1: RUN netdrop exit 0
+-- stdout
+copper 70 um: --t-um
+BATT_RAW     0.413 mohm   h=0.1 contact=pad
+Batt_SW      0.635 mohm   h=0.1 contact=pad
+VIN+         3.406 mohm   h=0.1 contact=pad
+VIN-         1.057 mohm   h=0.1 contact=pad
+V_Fused      2.478 mohm   h=0.1 contact=pad
+-- stderr
+
+== files

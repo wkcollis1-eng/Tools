@@ -13,8 +13,11 @@ Contact model at the source and sink pads (--contact):
 A soldered THT pin lies between the two [I]. Every other pad of the net, and every via, ties F.Cu to
 B.Cu over its own copper as one ideal node. Leaves out solder joints, pins, socket contacts, modules.
 
+The copper thickness is the board's own, from its stackup (common/copper.py), and is printed first;
+--t-um overrides it. Until 2026-10-08 it was 35 um, fixed.
+
 usage:
-  python netdrop.py <board> [--h 0.05] [--contact pad|drill] [--net NET ...]
+  python netdrop.py <board> [--h 0.05] [--contact pad|drill] [--net NET ...] [--t-um N]
   python netdrop.py --self-test
 """
 
@@ -32,6 +35,12 @@ from scipy.sparse.csgraph import connected_components
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gnd_drop import RHO, kid, kids, netname, parse, xf  # noqa: E402
 from tracknet import PATHS  # noqa: E402  (one definition of which pads each net runs between)
+
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
+)
+import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 
 class NotConnected(Exception):
@@ -309,15 +318,27 @@ def main():
     ap.add_argument("--h", type=float, default=0.05)
     ap.add_argument("--contact", choices=("pad", "drill"), default="pad")
     ap.add_argument("--net", nargs="*", default=list(PATHS))
+    ap.add_argument(
+        "--t-um",
+        type=float,
+        default=None,
+        help="copper thickness, um (default: the board's stackup)",
+    )
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
-    T = parse(open(a.board, encoding="utf-8").read())
+    text = open(a.board, encoding="utf-8").read()
+    try:
+        t_cu, line = copper.thickness(text, a.t_um)
+    except ValueError as e:
+        ap.error(f"copper: {e}; give --t-um")
+    print(line)
+    T = parse(text)
     for net in a.net:
         frm, to = PATHS[net]
         try:
-            r = solve(T, net, frm, to, a.h, a.contact)
+            r = solve(T, net, frm, to, a.h, a.contact, t_cu)
             print(f"{net:9} {r * 1e3:8.3f} mohm   h={a.h} contact={a.contact}")
         except (NotConnected, ValueError) as e:
             print(f"{net:9}  REFUSED: {e}")

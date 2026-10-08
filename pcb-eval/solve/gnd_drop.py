@@ -405,14 +405,11 @@ def main():
     if a.board is None:
         ap.error("the board file is required")
     text = FsPath(a.board).read_text(encoding="utf-8")
-    if a.t_um is not None:
-        t_cu, why = a.t_um * 1e-6, "--t-um"
-    else:
-        try:
-            t_cu, why = copper.outer(text)
-        except ValueError as e:
-            ap.error(f"copper: {e}; give --t-um")
-    print(f"copper {t_cu * 1e6:g} um: {why}")
+    try:
+        t_cu, line = copper.thickness(text, a.t_um)
+    except ValueError as e:
+        ap.error(f"copper: {e}; give --t-um")
+    print(line)
     pads, src, snk, info = solve(text, a.h, a.barrel_mohm * 1e-3, t_cu)
     print(info)
     print(f"source {src}  sink {snk}")

@@ -1,6 +1,11 @@
-== step 1: RUN netdrop exit 0
+== step 1: KPY make_fault.py exit 0
 -- stdout
-copper 35 um: stackup, F.Cu and B.Cu 35 um
+copper: none
+-- stderr
+
+== step 2: RUN netdrop exit 0
+-- stdout
+copper 35 um: no stackup in the board, 35 um assumed
 BATT_RAW     0.827 mohm   h=0.1 contact=pad
 Batt_SW      1.270 mohm   h=0.1 contact=pad
 VIN+         6.813 mohm   h=0.1 contact=pad

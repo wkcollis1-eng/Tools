@@ -44,9 +44,9 @@ These tools were copied as they were. The board-specific values are moving to a 
   - `solve/gnd_drop.py`'s pad set (design doc §7.3).
 - **Read from the board (2026-10-08):**
   - `kicad/viamove.py`'s clearance, hole-to-hole and copper-to-edge come from the board's design settings, and it prints them on its first line. It refuses a board that has a netclass with another clearance or a `.kicad_dru`, because it applies one clearance to every net and no custom rules. Until then they were the Top Off Charger's `0.2, 0.25, 0.5`, hard-coded.
-  - `solve/gnd_drop.py`'s copper thickness comes from the board's stackup (`common/copper.py`), and it prints it on its first line. It refuses a board whose F.Cu and B.Cu differ, and says "35 um assumed" for a board with no stackup. `--t-um` overrides it. Until then it was 35 µm unless given.
+  - The copper thickness in `solve/gnd_drop.py` and `solve/netdrop.py` comes from the board's stackup (`common/copper.py`), and each prints it on its first line. They refuse a board whose F.Cu and B.Cu differ, and say "35 um assumed" for a board with no stackup. `--t-um` overrides it. Until then gnd_drop used 35 µm unless given, and netdrop always did.
 - **All boards, as an assumption:**
-  - 1 oz copper (35 µm), fixed in `tracknet.py`, `inplace.py` and `netdrop.py`.
+  - 1 oz copper (35 µm), fixed in `tracknet.py` and `inplace.py`.
   - The ground net is named `GND`, in `islands.py`, `padconn.py` and `gnd_drop.py`.
   - `tracknet.py` treats vias as ideal links, because its track keys ignore the layer. Add each via barrel's resistance by hand.
 
@@ -71,7 +71,7 @@ The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOU
 - a ground island with its vias deleted;
 - a module moved past the board edge;
 - other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove);
-- 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop).
+- 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop, netdrop).
 
 Each fault case names a pattern its output must contain. The clean case beside it must not contain that pattern. `--record` will not write a case whose patterns fail.
 
