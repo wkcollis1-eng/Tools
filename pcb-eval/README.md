@@ -44,8 +44,13 @@ These tools were copied as they were. The board-specific values are moving to a 
 - **All boards, as an assumption:**
   - 1 oz copper (35 µm), fixed in `tracknet.py`, `inplace.py` and `netdrop.py`. `gnd_drop.py` takes the thickness as an argument, default 35 µm.
   - The ground net is named `GND`, in `islands.py`, `padconn.py` and `gnd_drop.py`.
+  - `tracknet.py` treats vias as ideal links, because its track keys ignore the layer. Add each via barrel's resistance by hand.
 
 On another board, check these values against its `.kicad_pro` and stackup before reading a figure from these tools.
+
+## Not yet tried on a board with a known fault
+
+`kicad/outlines.py` and `kicad/islands.py` (noted in the UPS Monitor review, 2026-10-07). Before trusting either, make a copy of a board with one ground island cut off from its vias and one module outline moved past the edge, and show that both tools report it.
 
 ## How the move was proven
 

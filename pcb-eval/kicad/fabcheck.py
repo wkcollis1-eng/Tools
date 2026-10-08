@@ -3,7 +3,8 @@ usage: KPY fabcheck.py <board.kicad_pcb>
 
 Written 2026-10-06 (session c79d6a13) for the Battery Bank Monitor Rev 2 review. The Top Off
 Charger's same check (session 673cc9d3) was run inline and not kept; this is it, persisted.
-Limits [S]: docs.oshpark.com/services/two-layer (copy in ../osh-spec/). Every figure printed is
+Limits [S]: docs.oshpark.com/services/two-layer (saved copy: osh-spec/ in the Battery Bank Monitor
+eval kit, local, not in Tools; it was ../osh-spec/ until the move, 2026-10-08). Every figure printed is
 measured from the geometry [K], not read from the design rules, because a rule only bounds what
 DRC flags and this board's via-annular rule (0.1) is looser than OSH Park's 0.127.
 Copper-to-edge assumes an axis-aligned rectangular outline (checked, and refused otherwise)."""
