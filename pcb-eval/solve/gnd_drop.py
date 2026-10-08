@@ -17,7 +17,7 @@ pad one node) and the GND vias (ideal, or F/B pairs joined by --barrel-mohm). It
 leaves out the modules, socket contacts, solder joints and temperature.
 
 usage:
-  python gnd_drop.py ["Top Off Charger- Oct 2026.kicad_pcb"] [--h 0.1]
+  python gnd_drop.py "Top Off Charger- Oct 2026.kicad_pcb" [--h 0.1]
                      [--barrel-mohm 0] [--t-um 35]
   python gnd_drop.py --self-test
 
@@ -40,7 +40,6 @@ from matplotlib.path import Path
 from scipy.sparse.csgraph import connected_components
 
 RHO = 1.724e-8  # ohm.m, annealed copper at 20 C
-DEFAULT_BOARD = FsPath(__file__).with_name("Top Off Charger- Oct 2026.kicad_pcb")
 LAY = {"F.Cu": 0, "B.Cu": 1}
 
 
@@ -375,7 +374,11 @@ def self_test():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("board", nargs="?", default=str(DEFAULT_BOARD))
+    # No default board: it was the board file beside this script, which stayed in
+    # DIY-LiFePO4-UPS Top-Off-Charger/pcb when the script moved to Tools (2026-10-08)
+    ap.add_argument(
+        "board", nargs="?", help=".kicad_pcb file (not needed for --self-test)"
+    )
     ap.add_argument("--h", type=float, default=0.1, help="cell size, mm (default 0.1)")
     ap.add_argument(
         "--barrel-mohm",
@@ -393,6 +396,8 @@ def main():
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.board is None:
+        ap.error("the board file is required")
     text = FsPath(a.board).read_text(encoding="utf-8")
     pads, src, snk, info = solve(text, a.h, a.barrel_mohm * 1e-3, a.t_um * 1e-6)
     print(info)
