@@ -1,0 +1,7 @@
+== step 1: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones
+-- stderr
+
+== files
+o.json sha256 66dcd54edeeb72aa891d2a5e1cd0f66678a56c98ad16c97a7d1c056f9ddcce29 lines 2870

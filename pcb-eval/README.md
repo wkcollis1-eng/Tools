@@ -48,9 +48,38 @@ These tools were copied as they were. The board-specific values are moving to a 
 
 On another board, check these values against its `.kicad_pro` and stackup before reading a figure from these tools.
 
-## Not yet tried on a board with a known fault
+## Tests
 
-`kicad/outlines.py` and `kicad/islands.py` (noted in the UPS Monitor review, 2026-10-07). Before trusting either, make a copy of a board with one ground island cut off from its vias and one module outline moved past the edge, and show that both tools report it.
+```text
+python tests/run_tests.py            compare every case with tests/expected/; exit 1 on any difference
+python tests/run_tests.py --record   rewrite tests/expected/ (read the git diff before committing it)
+python tests/run_tests.py islands    run only the cases whose name contains "islands"
+```
+
+The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOURCES.md`). For each case it compares the exit code, the output and any output files with the recorded run. It needs KiCad 10 (`KICAD_PYTHON`, and `KICAD_CLI` for the DRC cases) and a Python with numpy and scipy.
+
+- A change that should leave a tool's output alone must pass unchanged.
+- A change that should alter it is re-recorded with `--record`. The diff of `tests/expected/` then shows exactly what moved.
+
+**Fault cases.** `tests/make_fault.py` writes a copy of a clean board with one fault:
+
+- a 0.20 mm via drill;
+- a ground island with its vias deleted;
+- a module moved past the board edge.
+
+Each fault case names a pattern its output must contain. The clean case beside it must not contain that pattern. `--record` will not write a case whose patterns fail.
+
+Proven on 2026-10-08:
+
+- Two runs in a row passed.
+- In a copy of this folder, each of these failed the suite with exit 1: a looser drill limit in `fabcheck.py`, a changed copper thickness in `netdrop.py`, and a deleted expected file.
+
+## Tried on a board with a known fault (2026-10-08)
+
+`kicad/outlines.py` and `kicad/islands.py` had never been run on a board with a known fault (UPS Monitor review, 2026-10-07). The fault cases above did that:
+
+- **`islands.py`** shows the island whose vias were deleted as `GND vias 0`. On the clean rev 0.8 Top Off Charger it also prints `GND vias 0  GND pads []` for four slivers that are connected: each one touches a U4 GND pad. The tool finds a pad by testing whether the pad's centre lies in the fill. A thermal-relief pad's centre sits in a cutout, so the test misses it. Until that is fixed, `GND pads []` does not mean that no pad touches the island.
+- **`outlines.py`** prints each footprint's extents but not the board edge, so a module moved past the edge is not flagged. Compare the extents with the `edge` line from `dump.py` by hand. Its fault case has no pattern yet for this reason.
 
 ## How the move was proven
 
@@ -75,3 +104,4 @@ Two copies of tools had drifted between kits. Each was merged into the version t
 1. Put the tool in the folder for the runtime it needs. Its name must not already exist in another folder.
 2. Make the first line of its docstring the summary that `--list` prints, and say there what the tool assumes about the board.
 3. Before trusting the tool, prove it on a board with a known fault and on a clean board. It must report the fault and stay silent on the clean board.
+4. Add its cases to `tests/run_tests.py`: a clean case, and a fault case built by `tests/make_fault.py` with the pattern that shows the fault. Record them with `--record`, and run the suite before committing.

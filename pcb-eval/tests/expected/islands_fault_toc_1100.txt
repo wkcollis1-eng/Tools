@@ -1,0 +1,27 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+island: removed 1 GND via(s) from F.Cu island #1
+-- stderr
+
+== step 2: RUN islands exit 0
+-- stdout
+F.Cu islands 10
+  #0 bbox x 14.00-42.50 y 20.50-97.50  holes 4  GND vias 74  GND pads []
+  #1 bbox x 33.55-42.50 y 95.45-97.50  holes 0  GND vias 0  GND pads []
+  #2 bbox x 31.40-33.06 y 58.36-58.86  holes 0  GND vias 0  GND pads []
+  #3 bbox x 33.94-35.60 y 58.36-58.86  holes 0  GND vias 0  GND pads []
+  #4 bbox x 28.06-33.46 y 50.97-52.98  holes 0  GND vias 2  GND pads []
+  #5 bbox x 32.82-33.87 y 32.34-33.02  holes 0  GND vias 1  GND pads []
+  #6 bbox x 25.42-26.64 y 32.25-33.00  holes 0  GND vias 1  GND pads []
+  #7 bbox x 27.96-29.18 y 32.25-33.00  holes 0  GND vias 1  GND pads []
+  #8 bbox x 30.50-31.94 y 32.14-33.00  holes 0  GND vias 1  GND pads []
+  #9 bbox x 20.61-32.19 y 26.92-31.10  holes 0  GND vias 4  GND pads []
+B.Cu islands 5
+  #0 bbox x 31.40-33.06 y 58.36-58.86  holes 0  GND vias 0  GND pads []
+  #1 bbox x 33.94-35.60 y 58.36-58.86  holes 0  GND vias 0  GND pads []
+  #2 bbox x 26.97-35.48 y 32.14-52.05  holes 0  GND vias 8  GND pads []
+  #3 bbox x 19.80-28.93 y 32.25-37.25  holes 0  GND vias 2  GND pads []
+  #4 bbox x 14.00-42.50 y 20.50-97.50  holes 18  GND vias 74  GND pads ['NT1.1']
+-- stderr
+
+== files

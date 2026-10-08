@@ -1,2 +1,3 @@
 test-fixtures/
 __pycache__/
+pcb-eval/tests/fixtures/*.kicad_prl

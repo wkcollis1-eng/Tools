@@ -1,0 +1,14 @@
+== step 1: CLI pcb drc exit 0
+-- stdout
+Found 34 violations
+Found 0 unconnected items
+Saved DRC Report to a.json
+-- stderr
+
+== step 2: RUN drcset exit 0
+-- stdout
+a.json: {'warning': 34}, unconnected 0
+   set-identical to baseline
+-- stderr
+
+== files

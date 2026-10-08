@@ -1,0 +1,79 @@
+== step 1: RUN outlines exit 0
+-- stdout
+U1 Xiao ESP32C3 rot 180.0
+    F.Silkscreen [6.83, 6.85, 29.42, 24.75] size 22.59 x 17.91
+    F.Fab [10.01, 6.95, 27.9, 24.67] size 17.89 x 17.72
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step show True
+    model ${KIPRJMOD}/Seeed Studio XIAO-ESP32-C3.step show True
+H2 M3 rot 0.0
+    F.Fab [38.88, 8.15, 41.12, 9.85] size 2.25 x 1.7
+C4 C_Radial_D6.3mm_H11.0mm_P2.50mm rot -90.0
+    F.Silkscreen [28.17, 62.92, 34.83, 69.58] size 6.66 x 6.66
+    F.Fab [28.3, 63.05, 34.7, 69.45] size 6.4 x 6.4
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Radial_D6.3mm_H11.0mm_P2.50mm.step show True
+U2 INA260/INA228 rot -90.0
+    F.Silkscreen [4.57, 28.86, 27.58, 51.87] size 23.02 x 23.01
+    F.Fab [5.9, 29.32, 26.32, 32.08] size 20.42 x 2.76
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step show True
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Adafruit_INA260.step show True
+F1 1A SB Wurth 696108003002 rot 0.0
+    F.Silkscreen [9.98, 72.94, 34.56, 82.06] size 24.58 x 9.13
+    model ${KICAD10_3DMODEL_DIR}/Fuse.3dshapes/Fuseholder_Cylinder-5x20mm_Schurter_0031_8201_Horizontal_Open.step show True
+    model ${KICAD10_3DMODEL_DIR}/Fuse.3dshapes/Fuseholder_Schurter_0031.7701.xx.step show False
+R2 R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal rot 180.0
+    F.Silkscreen [11.67, 25.57, 18.33, 28.43] size 6.66 x 2.86
+    F.Fab [11.14, 25.7, 18.86, 28.3] size 7.72 x 2.6
+    model ${KICAD10_3DMODEL_DIR}/Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.step show True
+C5 0.1uF cer 50V rot 180.0
+    F.Silkscreen [30.67, 59.52, 34.83, 62.48] size 4.16 x 2.96
+    F.Fab [30.8, 59.65, 34.7, 62.35] size 3.9 x 2.7
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+ALERT TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [30.24, 17.74, 32.76, 20.26] size 2.52 x 2.52
+    F.Fab [29.21, 16.15, 33.79, 17.85] size 4.58 x 1.7
+3V3 TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [37.24, 45.74, 39.76, 48.26] size 2.52 x 2.52
+    F.Fab [36.99, 44.15, 40.01, 45.85] size 3.01 x 1.7
+U3 Pololu D24V7F3 rot 0.0
+    F.Silkscreen [14.93, 53.88, 29.07, 63.03] size 14.15 x 9.15
+    F.Fab [26.18, 54.64, 28.82, 62.36] size 2.64 x 7.72
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step show True
+H3 M3 rot 0.0
+    F.Fab [38.88, 78.15, 41.12, 79.85] size 2.25 x 1.7
+GND TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [37.24, 37.74, 39.76, 40.26] size 2.52 x 2.52
+    F.Fab [36.85, 36.15, 40.15, 37.85] size 3.3 x 1.7
+SDA TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [30.24, 22.24, 32.76, 24.76] size 2.52 x 2.52
+    F.Fab [29.97, 20.65, 33.03, 22.35] size 3.06 x 1.7
+H4 M3 rot 0.0
+Vin TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [37.24, 54.24, 39.76, 56.76] size 2.52 x 2.52
+    F.Fab [37.26, 52.65, 39.74, 54.35] size 2.49 x 1.7
+TB2 JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical rot -90.0
+    F.Silkscreen [36.43, 14.09, 42.81, 24.62] size 6.38 x 10.53
+    F.Fab [36.45, 14.5, 42.4, 24.5] size 5.95 x 10.0
+    model ${KICAD10_3DMODEL_DIR}/Connector_JST.3dshapes/JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.step show True
+SCL TestPoint_THTPad_2.0x2.0mm_Drill1.0mm rot 0.0
+    F.Silkscreen [30.24, 26.74, 32.76, 29.26] size 2.52 x 2.52
+    F.Fab [29.99, 25.15, 33.01, 26.85] size 3.01 x 1.7
+TB1 TerminalBlock_Phoenix_MKDS-1-2-3.81_1x02_P3.81mm_Horizontal rot -90.0
+    F.Silkscreen [3.11, 60.42, 11.38, 68.39] size 8.27 x 7.97
+    F.Fab [3.7, 60.55, 11.25, 68.26] size 7.55 x 7.71
+    model ${KICAD10_3DMODEL_DIR}/TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1-2-3.81_1x02_P3.81mm_Horizontal.step show True
+H1 M3 rot 0.0
+    F.Fab [2.88, 8.15, 5.12, 9.85] size 2.25 x 1.7
+C3 0.1uF cer 50V rot 180.0
+    F.Fab [15.8, 10.65, 19.7, 13.35] size 3.9 x 2.7
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+C2 0.1uF cer 50V rot 0.0
+    F.Silkscreen [21.67, 33.02, 25.83, 35.98] size 4.16 x 2.96
+    F.Fab [21.8, 33.15, 25.7, 35.85] size 3.9 x 2.7
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+C1 C_Disc_D5.0mm_W2.5mm_P2.50mm rot 0.0
+    F.Fab [26.2, 50.7, 31.3, 53.3] size 5.1 x 2.6
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D5.0mm_W2.5mm_P2.50mm.step show True
+-- stderr
+
+== files

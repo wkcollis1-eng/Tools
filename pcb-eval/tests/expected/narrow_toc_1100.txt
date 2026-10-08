@@ -1,0 +1,9 @@
+== step 1: RUN narrow exit 0
+-- stdout
+0 segments of ['NONE'] -> 1.5 mm
+ zone GND ['F.Cu', 'B.Cu'] 1258.8 mm2
+ zone GND ['B.Cu'] 1549.5 mm2
+-- stderr
+
+== files
+o.kicad_pcb sha256 49934cdf0c06907838a35b3dfc8a879afb27b38dd75f4cd1ee9acb64b15948ec lines 7967

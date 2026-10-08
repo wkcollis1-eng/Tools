@@ -1,0 +1,18 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+island: removed 3 GND via(s) from F.Cu island #0
+swig/python detected a memory leak of type 'PCB_VIA *', no destructor found.
+swig/python detected a memory leak of type 'PCB_VIA *', no destructor found.
+-- stderr
+
+== step 2: RUN islands exit 0
+-- stdout
+F.Cu islands 3
+  #0 bbox x 7.80-25.35 y 31.08-38.75  holes 0  GND vias 0  GND pads []
+  #1 bbox x 6.67-39.09 y 9.16-34.85  holes 0  GND vias 14  GND pads []
+  #2 bbox x 0.50-43.50 y 6.00-82.00  holes 8  GND vias 67  GND pads []
+B.Cu islands 1
+  #0 bbox x 0.50-43.50 y 6.00-82.00  holes 26  GND vias 81  GND pads []
+-- stderr
+
+== files

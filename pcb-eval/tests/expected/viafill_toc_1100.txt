@@ -1,0 +1,6 @@
+== step 1: RUN viafill exit 0
+-- stdout
+85 zone-net vias, 0 layer misses (rule: centre + >= 12/16)
+-- stderr
+
+== files

@@ -1,0 +1,9 @@
+== step 1: RUN variant exit 0
+-- stdout
+w=VIN+:B.Cu:3.40:33.57,55.75,24.24,55.75: 1 item(s)
+ zone GND ['F.Cu', 'B.Cu'] 1258.8 mm2
+ zone GND ['B.Cu'] 1548.9 mm2
+-- stderr
+
+== files
+o.kicad_pcb sha256 91ddb6f39373417657910e4729acba00ba6a9b15b732ff8fed7663bc3bd3ef8a lines 7964

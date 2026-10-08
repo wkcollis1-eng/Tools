@@ -1,0 +1,10 @@
+== step 1: RUN variant exit 0
+-- stdout
+relief=TB1.1: 1 item(s)
+pad=TB1.1:2.6: 1 item(s)
+ zone GND ['F.Cu', 'B.Cu'] 1256.2 mm2
+ zone GND ['B.Cu'] 1546.9 mm2
+-- stderr
+
+== files
+o.kicad_pcb sha256 2dada44e75fbbbe300d618bd3ffe5048ec2b28b769b8020ccf6dd14c11b69adc lines 7974

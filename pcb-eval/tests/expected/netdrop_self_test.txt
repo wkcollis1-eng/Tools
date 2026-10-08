@@ -1,0 +1,14 @@
+== step 1: RUN netdrop exit 0
+-- stdout
+strip L=10 w=2.0 h=0.05: 2.2289 vs 2.2166 mohm exact (+0.56%)
+strip L=10 w=2.0 h=0.025: 2.2227 vs 2.2166 mohm exact (+0.28%)
+strip L=20 w=2.95 h=0.05: 3.1808 vs 3.1725 mohm exact (+0.26%)
+strip L=20 w=2.95 h=0.025: 3.1767 vs 3.1725 mohm exact (+0.13%)
+strip L=6 w=3.85 h=0.05: 0.6461 vs 0.6397 mohm exact (+1.00%)
+strip L=6 w=3.85 h=0.025: 0.6429 vs 0.6397 mohm exact (+0.50%)
+cut track: refused (N: [('A', None)] and [('B', None)] are not joined by copper)
+no pad C: refused (N: no pad for [('C', None)])
+SELF-TEST PASSED
+-- stderr
+
+== files

@@ -1,0 +1,11 @@
+== step 1: RUN gnd_drop exit 0
+-- stdout
+strip: 1.9481 mohm vs 1.9457 mohm exact (+0.13%)
+cut pour: refused (TB2.2@(10.00,10.00) and TB1.2@(10.00,90.00) are not joined by GND copper (2 components))
+no TB2: refused (expected one GND pad on each of TB2 and TB1, found {'TB2': [], 'TB1': ['TB1.2@(10.00,10.00)', 'TB1.2@(10.00,90.00)']})
+pad inside TB2: reads TB2 (1.9481 mohm)
+coincident pads: refused (pads missing from the solved network: ['X2.1@(10.00,50.00)'])
+SELF-TEST PASSED
+-- stderr
+
+== files

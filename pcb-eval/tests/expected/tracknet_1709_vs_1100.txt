@@ -1,0 +1,22 @@
+== step 1: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 65 tracks 78 vias 2 zones
+-- stderr
+
+== step 2: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones
+-- stderr
+
+== step 3: RUN tracknet exit 0
+-- stdout
+net        old mohm  new mohm  new-old   (segs, summed mm old -> new)
+BATT_RAW       3.57      1.08    -2.49   (7, 28.2 -> 9, 32.5)
+Batt_SW        3.71       nan     +nan   (3, 13.8 -> 6, 21.6)
+VIN+          25.15       nan     +nan   (7, 77.6 -> 8, 47.3)
+VIN-           5.67       nan     +nan   (3, 17.3 -> 5, 21.9)
+V_Fused        6.52      6.22    -0.30   (7, 20.6 -> 6, 19.7)
+charge path (excl V_Fused)  old 38.10  new nan  diff +nan mohm
+-- stderr
+
+== files

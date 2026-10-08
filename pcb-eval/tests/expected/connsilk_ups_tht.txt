@@ -1,0 +1,21 @@
+== step 1: RUN connsilk exit 0
+-- stdout
+edge x -0.05-44.05 y 5.45-82.55
+
+TB2 at (40.00,17.00) rot -90
+   pad 1 GND        (40.00,17.00) round
+   pad 2 GPIO10_DQ  (40.00,19.50) round
+   pad 3 +3V3       (40.00,22.00) square
+   silk 'H2' (40.00,11.50) F.Silkscreen
+   silk 'C2, C3, C5 - CAP CER 0.1UF 50V X7R RADIAL' (38.00,17.50) B.Silkscreen
+   silk 'GND' (36.00,18.00) F.Silkscreen
+   silk 'DQ' (36.00,21.00) F.Silkscreen
+   silk 'R2 - RES 10K OHM 5% 1/4W AXIAL ' (38.00,21.50) B.Silkscreen
+
+TB1 at (7.50,62.50) rot -90
+   pad 1 GND        (7.50,62.50) round
+   pad 2 BATT_RAW   (7.50,66.31) square
+   silk 'TB1/BATTERY' (8.00,59.50) F.Silkscreen
+-- stderr
+
+== files

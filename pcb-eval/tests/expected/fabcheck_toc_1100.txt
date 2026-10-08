@@ -1,0 +1,29 @@
+== step 1: RUN fabcheck exit 0
+-- stdout
+outline: 1 Edge.Cuts item(s) ['Rect']; bbox incl. line width 29.600 x 78.100 mm
+  rectangle centreline 29.500 x 78.000 mm, line width 0.100
+
+holes: 86 vias, 59 PTH pads, 5 NPTH, 0 slots []
+  ok   min plated drill                     0.3000 mm  (OSH >= 0.254)
+  ok   via annular ring                     0.1500 mm  (OSH >= 0.127)  (sizes [(0.6, 0.3), (0.7, 0.3)])
+  ok   PTH pad annular ring                 0.1900 mm  (OSH >= 0.127)  U4.10 pad 1.40x1.40 drill 1.02
+  ok   hole-to-hole edge gap                0.6483 mm  (OSH >= 0.127)  via GND (31.90,77.30) / U4.10
+
+copper:
+  ok   min track width                      0.2000 mm  (OSH >= 0.1524)  +3V3 F.Cu
+  ok   netclass clearance (DRC-enforced)    0.2000 mm  (OSH >= 0.1524)  1 class(es)
+  ok   copper to edge (centreline)          0.5000 mm  (OSH >= 0.381)  track +3V3 F.Cu
+
+solder mask: board expansion 0.0 mm, min web rule 0.0 mm
+  ok   mask web, different-net pads         0.6900 mm  (OSH >= 0.1016)  U2.6 [VIN-] / U2.7 [VIN+]
+  info mask web, same-net pads             0.0000 mm  U4.11 [BATT_RAW] / U4.12 [BATT_RAW] (a web under OSH's min is removed, not a defect)
+
+silkscreen:
+  ok   silk line width (min)                0.1200 mm  (OSH >= 0.0762)  C2; 61 of 94 lines under the 0.127 recommended
+  ok   silk text stroke (min)               0.1000 mm  (OSH >= 0.0762)  'U4' height 1.0
+  info smallest text height 0.800 mm over 47 visible texts
+
+ALL WITHIN OSH 2-LAYER LIMITS
+-- stderr
+
+== files

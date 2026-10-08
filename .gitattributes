@@ -1,0 +1,4 @@
+# pcb-eval test fixtures and recorded outputs are stored byte for byte: ups_tht.kicad_pcb is CRLF
+# and must stay CRLF (pcb-eval/tests/fixtures/SOURCES.md).
+pcb-eval/tests/fixtures/** -text
+pcb-eval/tests/expected/** -text

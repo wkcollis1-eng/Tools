@@ -1,0 +1,89 @@
+== step 1: RUN outlines exit 0
+-- stdout
+U1 Xiao ESP32C3 rot 0.0
+    F.Silkscreen [13.8, 36.63, 36.4, 54.54] size 22.59 x 17.91
+    F.Fab [15.33, 36.72, 33.22, 54.44] size 17.89 x 17.72
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step show True
+    model ${KIPRJMOD}/Seeed Studio XIAO-ESP32-C3.step show True
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Seeed Studio XIAO-ESP32-C3.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step show True
+U4 Big MOSFET Slide Switch with Reverse Voltage Protection, MP #2814 rot 90.0
+    F.Silkscreen [20.7, 57.28, 44.33, 77.72] size 23.63 x 20.43
+    F.Fab [31.11, 66.38, 32.81, 68.62] size 1.7 x 2.25
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/big-mosfet-slide-switch-with-reverse-voltage-protection.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step show True
+C4 CAP ALUM 47UF 20% 50V RADIAL TH, EEU-FR1H470 rot 180.0
+    F.Silkscreen [17.72, 89.13, 24.38, 95.79] size 6.66 x 6.66
+    F.Fab [17.85, 89.26, 24.25, 95.66] size 6.4 x 6.4
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Radial_D6.3mm_H11.0mm_P2.50mm.step show True
+R1 1 kOhms ±5% 0.25W, 1/4W Through Hole Resistor Axial Carbon Film, CF14JT1K00 rot 180.0
+    F.Silkscreen [23.86, 41.57, 30.52, 44.43] size 6.66 x 2.86
+    F.Fab [23.33, 41.7, 31.05, 44.3] size 7.72 x 2.6
+    model ${KICAD10_3DMODEL_DIR}/Resistor_THT.3dshapes/R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal.step show True
+F1 FUSEHOLDER BLOCKS - PCB - CLIP C, 696108003002 rot 180.0
+    F.Silkscreen [15.44, 78.78, 40.02, 87.92] size 24.58 x 9.13
+    model ${KICAD10_3DMODEL_DIR}/Fuse.3dshapes/Fuseholder_Cylinder-5x20mm_Schurter_0031_8201_Horizontal_Open.step show False
+    model ${KICAD10_3DMODEL_DIR}/Fuse.3dshapes/Fuseholder_Schurter_0031.7701.xx.step show False
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Fuse Holder 696108003002/Download_STP_696108003002_rev1.stp show True
+C5 CAP CER 0.1UF 50V X7R RADIAL, K104K10X7RF53L2 rot 90.0
+    F.Silkscreen [24.82, 91.13, 27.78, 95.29] size 2.96 x 4.16
+    F.Fab [24.95, 91.26, 27.65, 95.16] size 2.7 x 3.9
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+NT1 NetTie-2_SMD_Pad0.5mm rot -41.8
+U2 Adafruit INA228 5832 rot 90.0
+    F.Silkscreen [18.5, 13.78, 44.03, 34.23] size 25.53 x 20.45
+    F.Fab [20.9, 30.3, 41.32, 32.94] size 20.42 x 2.64
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step show True
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Adafruit_INA260.step show False
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/5832 INA228 STEMMA QT.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x08_P2.54mm_Vertical.step show True
+U3 Pololu D24V7F3 rot 180.0
+    F.Silkscreen [28.23, 88.92, 42.38, 98.08] size 14.15 x 9.15
+    F.Fab [28.48, 89.6, 31.12, 97.32] size 2.64 x 7.72
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step show True
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/d24v7fx-step-down-voltage-regulators.step show True
+TB2 TERM BLK 2P SIDE ENT 3.81MM PCB, 5442756 rot 180.0
+    F.Silkscreen [14.71, 20.11, 22.68, 28.38] size 7.97 x 8.27
+    F.Fab [14.84, 20.7, 22.55, 28.25] size 7.71 x 7.55
+    model ${KICAD10_3DMODEL_DIR}/TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1-2-3.81_1x02_P3.81mm_Horizontal.step show True
+U5 Pololu Ideal Diode Reverse Voltage Protector, 4-60V, 10A, #5382 rot 180.0
+    F.Silkscreen [22.99, 61.33, 35.82, 69.06] size 12.83 x 7.73
+    F.Fab [28.43, 62.64, 30.68, 64.34] size 2.25 x 1.7
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x02_P2.54mm_Vertical.step show False
+    model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Pololu Ideal Diode.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x01_P2.54mm_Vertical.step show True
+H3 M3 rot 0.0
+    F.Fab [15.88, 45.05, 18.12, 46.75] size 2.25 x 1.7
+H4 M3 rot 0.0
+TB1 TERM BLK 2P SIDE ENT 3.81MM PCB, 5442756 rot -90.0
+    F.Silkscreen [13.11, 66.42, 21.38, 74.39] size 8.27 x 7.97
+    F.Fab [13.7, 66.55, 21.25, 74.26] size 7.55 x 7.71
+    model ${KICAD10_3DMODEL_DIR}/TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1-2-3.81_1x02_P3.81mm_Horizontal.step show True
+H1 M3 rot 0.0
+    F.Fab [38.38, 22.65, 40.62, 24.35] size 2.25 x 1.7
+C3 CAP CER 0.1UF 50V X7R RADIAL, K104K10X7RF53L2 rot 0.0
+    F.Fab [23.61, 48.37, 27.51, 51.06] size 3.9 x 2.7
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+C2 CAP CER 0.1UF 50V X7R RADIAL, K104K10X7RF53L2 rot 0.0
+    F.Silkscreen [15.67, 30.02, 19.83, 32.98] size 4.16 x 2.96
+    F.Fab [15.8, 30.15, 19.7, 32.85] size 3.9 x 2.7
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
+LED LED GREEN DIFFUSED T/H LED_D5.0mm - LTL-4231N rot 180.0
+    F.Silkscreen [15.5, 59.45, 18.85, 63.55] size 3.35 x 4.1
+    F.Fab [15.28, 59.55, 18.78, 63.45] size 3.5 x 3.9
+    model ${KICAD10_3DMODEL_DIR}/LED_THT.3dshapes/LED_D3.0mm.step show True
+    model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x02_P2.54mm_Vertical.step show True
+C1 CAP CER 10UF 10% 25V X7R RADIAL, FG18X5R1E106MRT00 rot 90.0
+    F.Fab [32.0, 92.2, 34.6, 97.3] size 2.6 x 5.1
+    model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D5.0mm_W2.5mm_P2.50mm.step show True
+-- stderr
+
+== files

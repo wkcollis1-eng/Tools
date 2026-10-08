@@ -1,0 +1,33 @@
+== step 1: CLI pcb drc exit 0
+-- stdout
+Found 26 violations
+Found 0 unconnected items
+Saved DRC Report to a.json
+-- stderr
+
+== step 2: CLI pcb drc exit 0
+-- stdout
+Found 34 violations
+Found 0 unconnected items
+Saved DRC Report to b.json
+-- stderr
+
+== step 3: RUN drcset exit 0
+-- stdout
+b.json: {'warning': 34}, unconnected 0
+   +  warning silk_edge_clearance ('Rectangle of U3 on F.Silkscreen', 'Rectangle on Edge.Cuts')
+   +  warning lib_footprint_mismatch ('Footprint U2',)
+   +  warning lib_footprint_mismatch ('Footprint U5',)
+   +  warning silk_over_copper ('PTH pad 2 [+3V3] of C2', 'Segment of U2 on F.Silkscreen')
+   +  warning silk_over_copper ('PTH pad 7 [VIN+] of U2', 'Segment of U2 on F.Silkscreen') x2
+   +  warning silk_over_copper ('Arc of U2 on F.Silkscreen', 'PTH pad 2 [+3V3] of C2')
+   +  warning silk_over_copper ('PTH pad 11 [BATT_RAW] of U4', 'Rectangle of U4 on F.Silkscreen')
+   +  warning silk_over_copper ('PTH pad 12 [BATT_RAW] of U4', 'Rectangle of U4 on F.Silkscreen')
+   +  warning silk_over_copper ('PTH pad 3 [VIN+] of U5', 'Rectangle of U5 on F.Silkscreen')
+   +  warning silk_over_copper ('PTH pad 1 [Batt_SW] of U5', 'Rectangle of U5 on F.Silkscreen')
+   -  warning silk_over_copper ('Footprint text of U1 (XIAO ESP32C3)', 'NPTH pad of H3')
+   -  warning silk_over_copper ('NPTH pad of H3', 'Reference field of U1')
+   -  warning silk_over_copper ('PTH pad 2 [GPIO3_LED] of LED', 'Segment of U1 on F.Silkscreen')
+-- stderr
+
+== files

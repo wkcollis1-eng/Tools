@@ -1,0 +1,18 @@
+== step 1: RUN padconn exit 0
+-- stdout
+zone GND ['F.Cu', 'B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
+zone GND ['B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
+U1.GND pad: inherit fp: inherit
+C4.2 pad: inherit fp: inherit
+U2.2 pad: inherit fp: inherit
+C5.1 pad: inherit fp: inherit
+U3.2 pad: inherit fp: inherit
+GND.1 pad: inherit fp: inherit
+TB2.1 pad: inherit fp: inherit
+TB1.1 pad: inherit fp: inherit
+C3.1 pad: inherit fp: inherit
+C2.1 pad: inherit fp: inherit
+C1.2 pad: inherit fp: inherit
+-- stderr
+
+== files

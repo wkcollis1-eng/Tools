@@ -1,0 +1,6 @@
+== step 1: RUN nosuchtool exit 2
+-- stdout
+
+-- stderr
+no tool 'nosuchtool'; try --list
+== files

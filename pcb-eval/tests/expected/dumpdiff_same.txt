@@ -1,0 +1,17 @@
+== step 1: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones
+-- stderr
+
+== step 2: RUN dumpdiff exit 0
+-- stdout
+edge True [13.45, 19.95, 43.05, 98.05, 29.6, 78.1]
+fps added [] removed []
+tracks 70 -> 70
+vias 86 -> 86 + [] - []
+ zone same GND ['F.Cu', 'B.Cu'] 1258.8
+ zone same GND ['B.Cu'] 1549.5
+zones count 2 2 | texts same: True
+-- stderr
+
+== files
