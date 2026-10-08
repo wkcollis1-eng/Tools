@@ -5,7 +5,7 @@
 # R13 2026-10-08: vias and pads were counted when their centre lay in the fill. That missed every pad on
 # thermal reliefs: on the rev 0.8 Top Off Charger four slivers between U4's GND pins printed
 # "GND vias 0  GND pads []" though each touches a U4 GND pad, and the main pour listed none of the 17
-# GND pads it touches. Found by the pcb-eval fault tests (Tools 8317005).
+# GND pads it touches. Found by the pcb-eval fault tests (Tools 909025b).
 # usage: islands.py <board> [gnd=NAME]   the ground net is GND unless given, printed first, and refused when
 # the board has no net of that name (common/groundnet.py). Until 2026-10-08 GND was assumed.
 import os

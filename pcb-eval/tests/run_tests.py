@@ -37,7 +37,7 @@ T1100, T1709, UT = (
 )
 DRC = ["CLI", "pcb", "drc", "--severity-all", "--format", "json", "-o"]
 NOISE = re.compile(r"^Adding duplicate image handler")
-# gnd_drop prints its wall-clock solve time. R13, 2026-10-08: 8317005 recorded "solve 0.6s", so the case
+# gnd_drop prints its wall-clock solve time. R13, 2026-10-08: 909025b recorded "solve 0.6s", so the case
 # failed whenever the solve rounded to another tenth: reproduced as "solve 0.7s" under CPU load [M, n=2].
 TIMING = re.compile(r"\bsolve \d+\.\ds\b")
 WIDE = "w=VIN+:B.Cu:3.40:33.57,55.75,24.24,55.75"
@@ -253,7 +253,7 @@ CASES = [
         [],
         [(ISL_CUT, True), (GND_DEFAULT, True)],
     ),
-    # R13 2026-10-08: an "islands fault ups_tht" case, added in 8317005, was removed. Every F.Cu island on
+    # R13 2026-10-08: an "islands fault ups_tht" case, added in 909025b, was removed. Every F.Cu island on
     # ups_tht touches a GND pad, so deleting its vias cuts none off. The old centre test hid that, and the
     # case passed on an island still tied through U2.2 and C2.1.
     (
