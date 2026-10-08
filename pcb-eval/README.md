@@ -84,7 +84,12 @@ Proven on 2026-10-08:
   - the fault case must show the tag, and both clean boards must not.
 
   Tracks are not checked, so a tagged island may still reach GND through a track. On the UPS Monitor THT board every island touches a GND pad, so there is no fault case for that board.
-- **`outlines.py`** prints each footprint's extents but not the board edge, so a module moved past the edge is not flagged. Compare the extents with the `edge` line from `dump.py` by hand. Its fault case has no pattern yet for this reason.
+- **`outlines.py`** printed each footprint's extents but not the board edge, so U1 moved past the edge was not flagged. Fixed the same day:
+  - it prints the board edge's bounding box;
+  - it tags each extent beyond the edge `PAST EDGE <mm>`;
+  - the fault case must show the tag on U1's F.Fab, and the clean board must not.
+
+  The tag is information, not a FAIL: modules may overhang by design. On the clean rev 0.8 board it marks only silkscreen extents (U2, U4, TB1, U3). It is a bounding-box test, so on a non-rectangular outline it misses an overhang into a notch.
 
 ## How the move was proven
 

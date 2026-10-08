@@ -44,6 +44,7 @@ OSH_DRILL = [
     (r"^OUTSIDE OSH LIMITS: min plated drill$", True),
 ]
 ISL_CUT = r"GND vias 0  GND pads \[\]  <- no GND via or pad$"  # islands.py's tag for a cut-off island
+U1_PAST = r"^U1 .*\n(?:    .*\n)*?    F\.Fab .* PAST EDGE "  # U1's own block, which make_fault.py moves
 DUMP_SAME = [
     (r"^edge True ", True),
     (r"^fps added \[\] removed \[\]$", True),
@@ -92,7 +93,7 @@ CASES = [
         [],
     ),
     ("offcentre toc_1100", [["RUN", "offcentre", T1100]], [], []),
-    ("outlines toc_1100", [["RUN", "outlines", T1100]], [], []),
+    ("outlines toc_1100", [["RUN", "outlines", T1100]], [], [(U1_PAST, False)]),
     ("outlines ups_tht", [["RUN", "outlines", UT]], [], []),
     (
         "outlines fault pastedge",
@@ -101,7 +102,7 @@ CASES = [
             ["RUN", "outlines", "f.kicad_pcb"],
         ],
         [],
-        [],
+        [(U1_PAST, True)],
     ),
     ("padconn toc_1100", [["RUN", "padconn", T1100]], [], []),
     ("padconn ups_tht", [["RUN", "padconn", UT]], [], []),

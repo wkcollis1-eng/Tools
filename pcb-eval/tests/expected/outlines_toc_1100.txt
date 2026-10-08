@@ -1,5 +1,6 @@
 == step 1: RUN outlines exit 0
 -- stdout
+board edge [13.45, 19.95, 43.05, 98.05] (bounding box, including line width)
 U1 Xiao ESP32C3 rot 0.0
     F.Silkscreen [13.8, 36.63, 36.4, 54.54] size 22.59 x 17.91
     F.Fab [15.33, 36.72, 33.22, 54.44] size 17.89 x 17.72
@@ -10,7 +11,7 @@ U1 Xiao ESP32C3 rot 0.0
     model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step show True
     model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x07_P2.54mm_Vertical.step show True
 U4 Big MOSFET Slide Switch with Reverse Voltage Protection, MP #2814 rot 90.0
-    F.Silkscreen [20.7, 57.28, 44.33, 77.72] size 23.63 x 20.43
+    F.Silkscreen [20.7, 57.28, 44.33, 77.72] size 23.63 x 20.43 PAST EDGE 1.28 mm
     F.Fab [31.11, 66.38, 32.81, 68.62] size 1.7 x 2.25
     model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/big-mosfet-slide-switch-with-reverse-voltage-protection.step show True
     model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x06_P2.54mm_Vertical.step show True
@@ -36,14 +37,14 @@ C5 CAP CER 0.1UF 50V X7R RADIAL, K104K10X7RF53L2 rot 90.0
     model ${KICAD10_3DMODEL_DIR}/Capacitor_THT.3dshapes/C_Disc_D3.8mm_W2.6mm_P2.50mm.step show True
 NT1 NetTie-2_SMD_Pad0.5mm rot -41.8
 U2 Adafruit INA228 5832 rot 90.0
-    F.Silkscreen [18.5, 13.78, 44.03, 34.23] size 25.53 x 20.45
+    F.Silkscreen [18.5, 13.78, 44.03, 34.23] size 25.53 x 20.45 PAST EDGE 6.17 mm
     F.Fab [20.9, 30.3, 41.32, 32.94] size 20.42 x 2.64
     model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step show True
     model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/Adafruit_INA260.step show False
     model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/5832 INA228 STEMMA QT.step show True
     model ${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x08_P2.54mm_Vertical.step show True
 U3 Pololu D24V7F3 rot 180.0
-    F.Silkscreen [28.23, 88.92, 42.38, 98.08] size 14.15 x 9.15
+    F.Silkscreen [28.23, 88.92, 42.38, 98.08] size 14.15 x 9.15 PAST EDGE 0.03 mm
     F.Fab [28.48, 89.6, 31.12, 97.32] size 2.64 x 7.72
     model ${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step show True
     model C:/Users/wkcol/OneDrive/Desktop/Adafruit INA260/d24v7fx-step-down-voltage-regulators.step show True
@@ -64,7 +65,7 @@ H3 M3 rot 0.0
     F.Fab [15.88, 45.05, 18.12, 46.75] size 2.25 x 1.7
 H4 M3 rot 0.0
 TB1 TERM BLK 2P SIDE ENT 3.81MM PCB, 5442756 rot -90.0
-    F.Silkscreen [13.11, 66.42, 21.38, 74.39] size 8.27 x 7.97
+    F.Silkscreen [13.11, 66.42, 21.38, 74.39] size 8.27 x 7.97 PAST EDGE 0.34 mm
     F.Fab [13.7, 66.55, 21.25, 74.26] size 7.55 x 7.71
     model ${KICAD10_3DMODEL_DIR}/TerminalBlock_Phoenix.3dshapes/TerminalBlock_Phoenix_MKDS-1-2-3.81_1x02_P3.81mm_Horizontal.step show True
 H1 M3 rot 0.0

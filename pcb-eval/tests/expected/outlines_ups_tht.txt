@@ -1,5 +1,6 @@
 == step 1: RUN outlines exit 0
 -- stdout
+board edge [-0.05, 5.45, 44.05, 82.55] (bounding box, including line width)
 U1 Xiao ESP32C3 rot 180.0
     F.Silkscreen [6.83, 6.85, 29.42, 24.75] size 22.59 x 17.91
     F.Fab [10.01, 6.95, 27.9, 24.67] size 17.89 x 17.72
