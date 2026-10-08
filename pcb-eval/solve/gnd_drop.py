@@ -406,7 +406,7 @@ def main():
         ap.error("the board file is required")
     text = FsPath(a.board).read_text(encoding="utf-8")
     try:
-        t_cu, line = copper.thickness(text, a.t_um)
+        t_cu, line = copper.thickness(copper.layers(text), a.t_um)
     except ValueError as e:
         ap.error(f"copper: {e}; give --t-um")
     print(line)

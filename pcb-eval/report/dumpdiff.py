@@ -1,4 +1,4 @@
-"""What changed between two dump.py json files: edge, footprints and pads, tracks, vias, zones.
+"""What changed between two dump.py json files: edge, copper thickness, footprints and pads, tracks, vias, zones.
 usage: dumpdiff.py <old.json> <new.json>"""
 
 import json
@@ -7,6 +7,8 @@ import sys
 A = json.load(open(sys.argv[1]))
 B = json.load(open(sys.argv[2]))
 print("edge", A["edge"] == B["edge"], B["edge"])
+cu = [D.get("copper_um", "not recorded (dump.py before 2026-10-08)") for D in (A, B)]
+print("copper_um", cu[0] == cu[1], cu[1])
 fa = {f["ref"]: f for f in A["fps"]}
 fb = {f["ref"]: f for f in B["fps"]}
 print("fps added", sorted(set(fb) - set(fa)), "removed", sorted(set(fa) - set(fb)))

@@ -1,9 +1,18 @@
-"""Dump a board to json: edge, footprints with pads, tracks, vias, zones, texts (KiCad python).
-usage: dump.py <board.kicad_pcb> <out.json>     the input to dumpdiff.py and tracknet.py"""
+"""Dump a board to json: edge, copper thickness, footprints with pads, tracks, vias, zones, texts (KiCad python).
+usage: dump.py <board.kicad_pcb> <out.json>     the input to dumpdiff.py and tracknet.py
+copper_um is common/copper.py's layers(): each stackup copper layer's thickness in um, null with no stackup.
+Added 2026-10-08 so tracknet.py reads the board's copper; tracknet refuses a dump without it."""
 
+import os
 import sys
 import json
 import pcbnew
+
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
+)
+import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 b = pcbnew.LoadBoard(sys.argv[1])
 mm = pcbnew.ToMM
@@ -17,6 +26,7 @@ out["edge"] = [
     mm(bb.GetWidth()),
     mm(bb.GetHeight()),
 ]
+out["copper_um"] = copper.layers(open(sys.argv[1], encoding="utf-8").read())
 ds = b.GetDesignSettings()
 fps = []
 for f in b.GetFootprints():
@@ -128,4 +138,6 @@ print(
     "vias",
     len(zs),
     "zones",
+    "copper_um",
+    out["copper_um"],
 )

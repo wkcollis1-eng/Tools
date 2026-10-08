@@ -330,7 +330,7 @@ def main():
         return self_test()
     text = open(a.board, encoding="utf-8").read()
     try:
-        t_cu, line = copper.thickness(text, a.t_um)
+        t_cu, line = copper.thickness(copper.layers(text), a.t_um)
     except ValueError as e:
         ap.error(f"copper: {e}; give --t-um")
     print(line)

@@ -1,0 +1,12 @@
+== step 1: WRITE a.json
+== step 2: RUN dumpdiff exit 0
+-- stdout
+edge True [0, 0, 0, 0, 0, 0]
+copper_um True not recorded (dump.py before 2026-10-08)
+fps added [] removed []
+tracks 0 -> 0
+vias 0 -> 0 + [] - []
+zones count 0 0 | texts same: True
+-- stderr
+
+== files

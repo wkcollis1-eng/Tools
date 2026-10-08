@@ -61,8 +61,11 @@ VM_AT = [
     "at=14.50,21.00:14.50,28.925",
     "at=14.50,21.00:30.00,57.975",
 ]
+DUMP_CU = r"copper_um \{'F\.Cu': 35\.0, 'B\.Cu': 35\.0\}$"  # dump.py's ok line on a 35 um stackup
+OLD_DUMP = '{"edge": [0, 0, 0, 0, 0, 0], "fps": [], "tracks": [], "vias": [], "zones": [], "texts": []}\n'
 DUMP_SAME = [
     (r"^edge True ", True),
+    (r"^copper_um True ", True),
     (r"^fps added \[\] removed \[\]$", True),
     (r"^vias (\d+) -> \1 \+ \[\] - \[\]$", True),
     (r"texts same: True$", True),
@@ -72,8 +75,22 @@ DUMP_SAME = [
 # name, steps, output files, [(regex, must match)] on the last step's stdout and stderr.
 # A step is ["RUN", tool, args...], ["KPY", script in tests/, args...], ["CLI", args...] or ["WRITE", file, text].
 CASES = [
-    ("dump toc_1100", [["RUN", "dump", T1100, "o.json"]], ["o.json"], []),
-    ("dump ups_tht", [["RUN", "dump", UT, "o.json"]], ["o.json"], []),
+    (
+        "dump toc_1100",
+        [["RUN", "dump", T1100, "o.json"]],
+        ["o.json"],
+        [(DUMP_CU, True)],
+    ),
+    ("dump ups_tht", [["RUN", "dump", UT, "o.json"]], ["o.json"], [(DUMP_CU, True)]),
+    (
+        "dump fault copper none",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
+            ["RUN", "dump", "f.kicad_pcb", "o.json"],
+        ],
+        ["o.json"],
+        [(r" copper_um None$", True)],
+    ),
     ("connsilk toc_1100", [["RUN", "connsilk", T1100, "TB1,TB2,U4"]], [], []),
     ("connsilk ups_tht", [["RUN", "connsilk", UT, "TB1,TB2"]], [], []),
     ("fabcheck toc_1100", [["RUN", "fabcheck", T1100]], [], OSH_OK),
@@ -271,6 +288,23 @@ CASES = [
         DUMP_SAME,
     ),
     (
+        "dumpdiff fault copper 70",
+        [
+            ["RUN", "dump", T1100, "a.json"],
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
+            ["RUN", "dump", "f.kicad_pcb", "b.json"],
+            ["RUN", "dumpdiff", "a.json", "b.json"],
+        ],
+        [],
+        [(r"^copper_um False \{'F\.Cu': 70\.0, 'B\.Cu': 70\.0\}$", True)],
+    ),
+    (
+        "dumpdiff old dump",
+        [["WRITE", "a.json", OLD_DUMP], ["RUN", "dumpdiff", "a.json", "a.json"]],
+        [],
+        [(r"^copper_um True not recorded \(dump\.py before 2026-10-08\)$", True)],
+    ),
+    (
         "tracknet 1709 vs 1100",
         [
             ["RUN", "dump", T1709, "a.json"],
@@ -278,7 +312,53 @@ CASES = [
             ["RUN", "tracknet", "a.json", "b.json"],
         ],
         [],
+        [
+            ("^old: " + CU_STACK[1:] % {"t": 35}, True),
+            ("^new: " + CU_STACK[1:] % {"t": 35}, True),
+        ],
+    ),
+    (
+        "tracknet fault copper 70",
+        [
+            ["RUN", "dump", T1100, "a.json"],
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
+            ["RUN", "dump", "f.kicad_pcb", "b.json"],
+            ["RUN", "tracknet", "a.json", "b.json"],
+        ],
         [],
+        [("^new: " + CU_STACK[1:] % {"t": 70}, True)],
+    ),
+    (
+        "tracknet fault copper mixed",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
+            ["RUN", "dump", "f.kicad_pcb", "a.json"],
+            ["RUN", "tracknet", "a.json", "a.json"],
+        ],
+        [],
+        [(r"^a\.json: " + CU_MIXED + "$", True), (r"^net ", False)],
+    ),
+    (
+        "tracknet fault copper none",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
+            ["RUN", "dump", "f.kicad_pcb", "a.json"],
+            ["RUN", "tracknet", "a.json", "a.json"],
+        ],
+        [],
+        [("^old: " + CU_NONE[1:], True)],
+    ),
+    (
+        "tracknet fault old dump",
+        [["WRITE", "a.json", OLD_DUMP], ["RUN", "tracknet", "a.json", "a.json"]],
+        [],
+        [
+            (
+                r"^a\.json: no copper_um \(written by dump\.py before 2026-10-08\); re-run dump\.py$",
+                True,
+            ),
+            (r"^net ", False),
+        ],
     ),
     (
         "netdrop toc_1100",

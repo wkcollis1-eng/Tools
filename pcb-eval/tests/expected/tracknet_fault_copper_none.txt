@@ -1,0 +1,24 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: none
+-- stderr
+
+== step 2: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um None
+-- stderr
+
+== step 3: RUN tracknet exit 0
+-- stdout
+old: copper 35 um: no stackup in the board, 35 um assumed
+new: copper 35 um: no stackup in the board, 35 um assumed
+net        old mohm  new mohm  new-old   (segs, summed mm old -> new)
+BATT_RAW       1.08      1.08    +0.00   (9, 32.5 -> 9, 32.5)
+Batt_SW         nan       nan     +nan   (6, 21.6 -> 6, 21.6)
+VIN+            nan       nan     +nan   (8, 47.3 -> 8, 47.3)
+VIN-            nan       nan     +nan   (5, 21.9 -> 5, 21.9)
+V_Fused        6.22      6.22    +0.00   (6, 19.7 -> 6, 19.7)
+charge path (excl V_Fused)  old nan  new nan  diff +nan mohm
+-- stderr
+
+== files

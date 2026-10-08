@@ -1,0 +1,29 @@
+== step 1: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 35.0, 'B.Cu': 35.0}
+-- stderr
+
+== step 2: KPY make_fault.py exit 0
+-- stdout
+copper: 70
+-- stderr
+
+== step 3: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 70.0, 'B.Cu': 70.0}
+-- stderr
+
+== step 4: RUN tracknet exit 0
+-- stdout
+old: copper 35 um: stackup, F.Cu and B.Cu 35 um
+new: copper 70 um: stackup, F.Cu and B.Cu 70 um
+net        old mohm  new mohm  new-old   (segs, summed mm old -> new)
+BATT_RAW       1.08      0.54    -0.54   (9, 32.5 -> 9, 32.5)
+Batt_SW         nan       nan     +nan   (6, 21.6 -> 6, 21.6)
+VIN+            nan       nan     +nan   (8, 47.3 -> 8, 47.3)
+VIN-            nan       nan     +nan   (5, 21.9 -> 5, 21.9)
+V_Fused        6.22      3.11    -3.11   (6, 19.7 -> 6, 19.7)
+charge path (excl V_Fused)  old nan  new nan  diff +nan mohm
+-- stderr
+
+== files

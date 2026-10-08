@@ -11,20 +11,25 @@ ASSUMED = 35e-6  # m: what every tool assumed before 2026-10-08; used only when 
 COPPER = re.compile(r'\(layer "([^"]+)"\s*\(type "copper"\)\s*\(thickness ([0-9.]+)')
 
 
-def outer(text):
-    """(thickness in m, a note saying where it came from) for F.Cu and B.Cu of a .kicad_pcb text.
+def layers(text):
+    """{layer: thickness in um} for every copper layer of a .kicad_pcb text's stackup; None when it has none.
+
+    dump.py records this, so a tool that reads a dump gets the same answer as one that reads the board."""
+    i = text.find("(stackup")
+    if i < 0:
+        return None
+    # in um, rounded: 0.035 mm * 1e-3 is 1 ulp off 35e-6, and 35.0 * 1e-6 is the value the tools used before
+    return {n: round(float(v) * 1e3, 6) for n, v in COPPER.findall(text, i)}
+
+
+def outer(cu):
+    """(thickness in m, a note saying where it came from) for F.Cu and B.Cu, from layers().
 
     ValueError when the stackup lacks either layer or gives them different thicknesses: the solvers give
     both layers one sheet resistance."""
-    i = text.find("(stackup")
-    if i < 0:
+    if cu is None:
         return ASSUMED, "no stackup in the board, 35 um assumed"
-    # in um, rounded: 0.035 mm * 1e-3 is 1 ulp off 35e-6, and 35.0 * 1e-6 is the value the tools used before
-    um = {
-        n: round(float(v) * 1e3, 6)
-        for n, v in COPPER.findall(text, i)
-        if n in ("F.Cu", "B.Cu")
-    }
+    um = {n: v for n, v in cu.items() if n in ("F.Cu", "B.Cu")}
     if sorted(um) != ["B.Cu", "F.Cu"]:
         raise ValueError(
             f"the stackup gives copper for {sorted(um)}, not F.Cu and B.Cu"
@@ -37,10 +42,10 @@ def outer(text):
     return um["F.Cu"] * 1e-6, f"stackup, F.Cu and B.Cu {um['F.Cu']:g} um"
 
 
-def thickness(text, t_um=None, option="--t-um"):
+def thickness(cu, t_um=None, option="--t-um"):
     """(thickness in m, the line a tool prints first): t_um (given by the tool's option) if not None, else
-    outer(text).
+    outer(cu), where cu is layers(board text) or a dump's "copper_um".
 
     ValueError as outer(). One copy of that line, so every tool states its copper the same way."""
-    t, why = (t_um * 1e-6, option) if t_um is not None else outer(text)
+    t, why = (t_um * 1e-6, option) if t_um is not None else outer(cu)
     return t, f"copper {t * 1e6:g} um: {why}"

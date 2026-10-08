@@ -1,7 +1,7 @@
 == step 1: RUN dump exit 0
 -- stdout
-ok [-0.05, 5.45, 44.05, 82.55, 44.1, 77.1] 22 fps 62 tracks 84 vias 2 zones
+ok [-0.05, 5.45, 44.05, 82.55, 44.1, 77.1] 22 fps 62 tracks 84 vias 2 zones copper_um {'F.Cu': 35.0, 'B.Cu': 35.0}
 -- stderr
 
 == files
-o.json sha256 9642a962466133bdb3efc280f61c3a9bb464210e50872fc5c5945e14cebcf805 lines 2665
+o.json sha256 89db8ee0d87659818ca038437eb2c0285e35850f80e8b51a6b330165d9291127 lines 2669

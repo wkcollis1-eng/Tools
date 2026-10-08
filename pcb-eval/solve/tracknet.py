@@ -7,13 +7,20 @@ they are not; on the 19:25 save one read VIN+ 0.10 mohm low. Remove debris from 
 R13 2026-10-06 (session 673cc9d3): on the 21:54 save VIN- joins by OVERLAP (3.85 mm run ends at 34.5,28.0, the
 1.7 mm stub starts at 34.92,29.42), so its graph is open; lstsq on the singular matrix printed 0.16 mohm instead
 of refusing. Now refused (nan). The same save charges Batt_SW +1.46 mohm for a 0.2 x 0.59 mm link that a 4 mm
-end cap covers. Both are the 1-D model, not the board: use netdrop.py (2-D) when joins are overlaps or stubs."""
+end cap covers. Both are the 1-D model, not the board: use netdrop.py (2-D) when joins are overlaps or stubs.
+rs is each dump's copper (dump.py's copper_um, read by common/copper.py), printed first per board; a dump
+without copper_um is refused. Until 2026-10-08 it was RS = 1.724e-8 / 35e-6 (1 oz), fixed."""
 
 import json
+import os
 import sys
 import numpy as np
 
-RS = 1.724e-8 / 35e-6  # ohm/sq, 1 oz
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
+)
+import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 PATHS = {  # net: (from pads, to pads)
     "BATT_RAW": ([("TB1", None)], [("U4", "11"), ("U4", "12")]),
@@ -24,7 +31,7 @@ PATHS = {  # net: (from pads, to pads)
 }
 
 
-def solve(d, net, frm, to):
+def solve(d, net, frm, to, rs):  # rs: sheet resistance, ohm/sq
     segs = [t for t in d["tracks"] if t["net"] == net]
 
     def key(x, y):
@@ -47,7 +54,7 @@ def solve(d, net, frm, to):
         cuts = sorted(set(cuts))
         for t0, t1 in zip(cuts, cuts[1:]):
             p0, p1 = a + t0 * v, a + t1 * v
-            edges.append((key(*p0), key(*p1), RS * (t1 - t0) * L / s["w"], s["layer"]))
+            edges.append((key(*p0), key(*p1), rs * (t1 - t0) * L / s["w"], s["layer"]))
     pads = {
         (f["ref"], p["n"]): p for f in d["fps"] for p in f["pads"] if p["net"] == net
     }
@@ -112,8 +119,18 @@ if __name__ == "__main__":  # netdrop.py imports PATHS
     res = {}
     for brd, path in (("old", sys.argv[1]), ("new", sys.argv[2])):
         d = json.load(open(path))
+        # R8: an old dump says nothing about its copper; do not assume 35 um
+        if "copper_um" not in d:
+            sys.exit(
+                f"{path}: no copper_um (written by dump.py before 2026-10-08); re-run dump.py"
+            )
+        try:
+            t_cu, line = copper.thickness(d["copper_um"])
+        except ValueError as e:
+            sys.exit(f"{path}: copper: {e}")
+        print(f"{brd}: {line}")
         for net, (f, t) in PATHS.items():
-            res[(brd, net)] = solve(d, net, f, t)
+            res[(brd, net)] = solve(d, net, f, t, copper.RHO / t_cu)
     print(
         f"{'net':9} {'old mohm':>9} {'new mohm':>9} {'new-old':>8}   (segs, summed mm old -> new)"
     )

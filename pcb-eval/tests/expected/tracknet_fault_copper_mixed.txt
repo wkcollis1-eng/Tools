@@ -1,0 +1,16 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: 35,70
+-- stderr
+
+== step 2: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 35.0, 'B.Cu': 70.0}
+-- stderr
+
+== step 3: RUN tracknet exit 1
+-- stdout
+
+-- stderr
+a.json: copper: F.Cu 35 um and B.Cu 70 um differ; these tools give both layers one thickness
+== files

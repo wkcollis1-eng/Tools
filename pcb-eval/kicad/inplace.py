@@ -26,7 +26,9 @@ T_UM = next((float(a[5:]) for a in sys.argv[4:] if a.startswith("t_um=")), None)
 CLR = float(pos[0]) if len(pos) > 0 else 0.2
 EDGE = float(pos[1]) if len(pos) > 1 else 0.5
 try:
-    t_cu, line = copper.thickness(open(brd, encoding="utf-8").read(), T_UM, "t_um=")
+    t_cu, line = copper.thickness(
+        copper.layers(open(brd, encoding="utf-8").read()), T_UM, "t_um="
+    )
 except ValueError as e:
     sys.exit(f"copper: {e}; give t_um=N")
 print(line)

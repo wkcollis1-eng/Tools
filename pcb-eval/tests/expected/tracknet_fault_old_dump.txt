@@ -1,0 +1,7 @@
+== step 1: WRITE a.json
+== step 2: RUN tracknet exit 1
+-- stdout
+
+-- stderr
+a.json: no copper_um (written by dump.py before 2026-10-08); re-run dump.py
+== files

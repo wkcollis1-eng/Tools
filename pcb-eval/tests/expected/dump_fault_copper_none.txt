@@ -1,0 +1,12 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: none
+-- stderr
+
+== step 2: RUN dump exit 0
+-- stdout
+ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um None
+-- stderr
+
+== files
+o.json sha256 cae866e904bde267aafafd802e4f1b376ccd2544ea5acb62813f16af3af7b1c5 lines 2871
