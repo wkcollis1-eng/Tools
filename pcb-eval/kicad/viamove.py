@@ -17,7 +17,7 @@ Rules are this board's .kicad_pro values (2026-10-06). Vias are moved in turn, e
 2026-10-08: the 0.2 / 0.25 / 0.5 above were the Top Off Charger's, hard-coded. They are now read from the board's
 design settings (the Default netclass clearance, min hole-to-hole, min copper-to-edge) and printed on the first
 line. A board with a netclass of another clearance, or a .kicad_dru beside it, is refused: one clearance for
-every net, and no custom rules, is all this tool applies.
+every net, and no custom rules, is all this tool applies. The reading is common/rules.py's (shared with inplace.py).
 Prints via=X,Y:X2,Y2 lines for variant.py. Fill coverage after refill and DRC remain the gate.
   at=X,Y:X2,Y2  instead of searching, print what the via at X,Y would break at X2,Y2 (repeatable)."""
 
@@ -25,6 +25,12 @@ import math
 import os
 import sys
 import pcbnew
+
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
+)
+import rules  # noqa: E402  (one copy of how a board's design rules are read)
 
 brd, opsf = sys.argv[1], sys.argv[2]
 pos = [a for a in sys.argv[3:] if "=" not in a]
@@ -34,19 +40,7 @@ RMAX = float(pos[0]) if len(pos) > 0 else 2.0
 STEP = float(pos[1]) if len(pos) > 1 else 0.05
 b = pcbnew.LoadBoard(brd)
 u = 1e6
-ds = b.GetDesignSettings()
-ns = ds.m_NetSettings
-CLR = ns.GetDefaultNetclass().GetClearance() / u
-H2H, EDGE = ds.m_HoleToHoleMin / u, ds.m_CopperEdgeClearance / u
-odd = [
-    f"netclass {k} clearance {c.GetClearance() / u:g} mm"
-    for k, c in ns.GetNetclasses().items()
-    if c.HasClearance() and c.GetClearance() / u != CLR
-]
-if os.path.exists(os.path.splitext(brd)[0] + ".kicad_dru"):
-    odd.append(
-        "custom rules " + os.path.basename(os.path.splitext(brd)[0]) + ".kicad_dru"
-    )
+CLR, H2H, EDGE, odd = rules.read(b, brd)
 if odd:
     sys.exit(
         f"viamove applies one clearance ({CLR:g} mm) to every net and no custom rules; this board has "

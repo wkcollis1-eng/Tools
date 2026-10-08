@@ -1,0 +1,12 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+rules: clearance 0.25, hole-to-hole 0.30, copper-to-edge 0.60 mm
+-- stderr
+
+== step 2: WRITE f.kicad_dru
+== step 3: RUN inplace exit 1
+-- stdout
+copper 35 um: stackup, F.Cu and B.Cu 35 um
+-- stderr
+inplace applies one clearance (0.25 mm) to every net and no custom rules; this board has custom rules f.kicad_dru; give clearance_mm
+== files

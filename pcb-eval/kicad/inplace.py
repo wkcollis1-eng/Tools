@@ -1,6 +1,10 @@
 """Widest in-place width for each track of NET on LAYER (KiCad python). 2026-10-06, session 4dcbc5e4.
-usage: inplace.py <board> <NET> <LAYER> [clearance_mm=0.2] [edge_mm=0.5] [novia=GND] [t_um=N]
+usage: inplace.py <board> <NET> <LAYER> [clearance_mm] [edge_mm] [novia=GND] [t_um=N]
 novia=NET leaves that net's vias out of the obstacles: the width a segment could reach if they moved (viamove.py).
+clearance_mm and edge_mm default to the board's design settings (the Default netclass clearance and min
+copper-to-edge, common/rules.py), printed on the second line. Without clearance_mm, a board with a netclass of
+another clearance or a .kicad_dru beside it is refused, as viamove.py does. Until 2026-10-08 they defaulted to
+0.2 and 0.5, the Top Off Charger's. NPTH holes get the same clearance: the board's hole clearance is not read.
 R uses the board's copper thickness, from its stackup (common/copper.py), printed first; t_um=N overrides it.
 Until 2026-10-08 it was RS = 0.4926 mohm/sq (35 um), fixed.
 Exact over the whole segment, end caps included (corridor.py samples the interior only and skips 1.5 mm at
@@ -18,13 +22,12 @@ sys.path.insert(
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
 )
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
+import rules  # noqa: E402  (one copy of how a board's design rules are read)
 
 brd, NET, LAYER = sys.argv[1], sys.argv[2], sys.argv[3]
 pos = [a for a in sys.argv[4:] if "=" not in a]
 NOVIA = {a[6:] for a in sys.argv[4:] if a.startswith("novia=")}
 T_UM = next((float(a[5:]) for a in sys.argv[4:] if a.startswith("t_um=")), None)
-CLR = float(pos[0]) if len(pos) > 0 else 0.2
-EDGE = float(pos[1]) if len(pos) > 1 else 0.5
 try:
     t_cu, line = copper.thickness(
         copper.layers(open(brd, encoding="utf-8").read()), T_UM, "t_um="
@@ -34,6 +37,21 @@ except ValueError as e:
 print(line)
 b = pcbnew.LoadBoard(brd)
 u = 1e6
+CLR, _, EDGE, odd = rules.read(b, brd)
+if pos:
+    CLR = float(pos[0])
+elif odd:
+    sys.exit(
+        f"inplace applies one clearance ({CLR:g} mm) to every net and no custom rules; this board has "
+        + "; ".join(odd)
+        + "; give clearance_mm"
+    )
+if len(pos) > 1:
+    EDGE = float(pos[1])
+src = ["given" if len(pos) > i else "board design settings" for i in (0, 1)]
+print(
+    f"# rules: clearance {CLR:.3f} mm ({src[0]}) copper-to-edge {EDGE:.3f} mm ({src[1]})"
+)
 lid = b.GetLayerID(LAYER)
 
 

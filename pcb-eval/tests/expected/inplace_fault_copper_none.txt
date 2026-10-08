@@ -6,6 +6,7 @@ copper: none
 == step 2: RUN inplace exit 0
 -- stdout
 copper 35 um: no stackup in the board, 35 um assumed
+# rules: clearance 0.200 mm (board design settings) copper-to-edge 0.500 mm (board design settings)
 21.65,58.34,21.65,64.42  L  6.08  w 2.90  max in-place  3.26 mm  limit U5.4                    R  1.03 mohm
 37.46,51.86,33.57,55.75  L  5.50  w 2.95  max in-place  3.50 mm  limit via GND@35.60,56.90     R  0.92 mohm
 37.46,31.60,37.46,35.00  L  3.40  w 2.95  max in-place  3.08 mm  limit U2.6                    R  0.57 mohm

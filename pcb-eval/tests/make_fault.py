@@ -7,8 +7,9 @@ usage: make_fault.py <kind> <in.kicad_pcb> <out.kicad_pcb> [REF]
   pastedge  move footprint REF so its centre sits on the right board edge. outlines.py must flag it.
   drill     set the first via's drill (sorted by position) to 0.20 mm. fabcheck.py must FAIL it.
   rules     set the Default netclass clearance to 0.25, hole-to-hole to 0.30 and copper-to-edge to 0.60 mm
-            (a board with other rules). viamove.py must print and apply them.
-  netclass  add netclass Power, clearance 0.30 mm, for net REF. viamove.py must refuse the board.
+            (a board with other rules). viamove.py and inplace.py must print and apply them.
+  netclass  add netclass Power, clearance 0.30 mm, for net REF. viamove.py must refuse the board, and
+            inplace.py too unless given clearance_mm.
   copper    set the stackup's F.Cu and B.Cu thickness: REF is "70" (both, um), "35,70" (F, B) or "none"
             (remove the stackup). Edits the text: KiCad 10's Python does not wrap the stackup. The tools
             that read common/copper.py must follow it, refuse "35,70", and say "assumed" for "none".

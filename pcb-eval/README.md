@@ -33,7 +33,7 @@ python run.py <tool> [args...]     e.g. python run.py dump board.kicad_pcb dump.
 
 Each tool's docstring gives its own arguments.
 
-`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup.
+`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup. `rules.py` reads the design rules from a board that a `kicad/` tool has loaded; it is handed the board, so it imports nothing from KiCad.
 
 ## Still tied to one board
 
@@ -44,6 +44,7 @@ These tools were copied as they were. The board-specific values are moving to a 
   - `solve/gnd_drop.py`'s pad set (design doc §7.3).
 - **Read from the board (2026-10-08):**
   - `kicad/viamove.py`'s clearance, hole-to-hole and copper-to-edge come from the board's design settings, and it prints them on its first line. It refuses a board that has a netclass with another clearance or a `.kicad_dru`, because it applies one clearance to every net and no custom rules. Until then they were the Top Off Charger's `0.2, 0.25, 0.5`, hard-coded.
+  - `kicad/inplace.py`'s clearance and copper-to-edge come from the same reading (`common/rules.py`), printed on its second line. It refuses the same boards unless given `clearance_mm`. Until then they defaulted to the Top Off Charger's `0.2` and `0.5`.
   - The copper thickness in `solve/gnd_drop.py`, `solve/netdrop.py` and `kicad/inplace.py` comes from the board's stackup (`common/copper.py`), and each prints it on its first line. They refuse a board whose F.Cu and B.Cu differ, and say "35 um assumed" for a board with no stackup. `--t-um` (inplace: `t_um=`) overrides it. Until then gnd_drop used 35 µm unless given, and the other two always did.
   - `kicad/dump.py` records the stackup's copper as `copper_um`, and `solve/tracknet.py` uses each dump's, printing it per board. tracknet refuses a dump without `copper_um` (written before 2026-10-08: re-run `dump.py`) and one whose F.Cu and B.Cu differ. `report/dumpdiff.py` reports a copper change. Until then tracknet used 35 µm.
 - **All boards, as an assumption:**
@@ -70,7 +71,7 @@ The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOU
 - a 0.20 mm via drill;
 - a ground island with its vias deleted;
 - a module moved past the board edge;
-- other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove);
+- other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove, inplace);
 - 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop, netdrop, inplace, and dump with dumpdiff and tracknet), and a dump written before `copper_um` existed (dumpdiff, tracknet).
 
 Each fault case names a pattern its output must contain. The clean case beside it must not contain that pattern. `--record` will not write a case whose patterns fail.

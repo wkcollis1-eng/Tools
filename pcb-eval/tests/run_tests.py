@@ -56,6 +56,8 @@ VM_RULES = r"^# rules: clearance %.3f hole-to-hole %.3f copper-to-edge %.3f mm "
 CU_STACK = r"^copper %(t)d um: stackup, F\.Cu and B\.Cu %(t)d um$"
 CU_MIXED = r"copper: F\.Cu 35 um and B\.Cu 70 um differ; these tools give both layers one thickness"
 CU_NONE = r"^copper 35 um: no stackup in the board, 35 um assumed$"
+# inplace.py's rules line: clearance, its source, copper-to-edge, its source ("board" = board design settings)
+IP_RULES = r"^# rules: clearance %.3f mm \(%s.*\) copper-to-edge %.3f mm \(%s.*\)$"
 VM_AT = [
     "at=14.50,21.00:14.35,21.00",
     "at=14.50,21.00:14.50,28.925",
@@ -108,7 +110,53 @@ CASES = [
         "inplace toc_1100",
         [["RUN", "inplace", T1100, "VIN+", "B.Cu"]],
         [],
-        [(CU_STACK % {"t": 35}, True)],
+        [(CU_STACK % {"t": 35}, True), (IP_RULES % (0.2, "board", 0.5, "board"), True)],
+    ),
+    (
+        "inplace fault rules",
+        [
+            ["KPY", "make_fault.py", "rules", T1100, "f.kicad_pcb"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [(IP_RULES % (0.25, "board", 0.6, "board"), True)],
+    ),
+    (
+        "inplace fault netclass",
+        [
+            ["KPY", "make_fault.py", "netclass", T1100, "f.kicad_pcb", "VIN+"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [
+            (
+                r"this board has netclass Power clearance 0\.3 mm; give clearance_mm$",
+                True,
+            ),
+            (r"^# rules", False),
+        ],
+    ),
+    (
+        "inplace fault netclass clearance given",
+        [
+            ["KPY", "make_fault.py", "netclass", T1100, "f.kicad_pcb", "VIN+"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu", "0.3"],
+        ],
+        [],
+        [(IP_RULES % (0.3, "given", 0.5, "board"), True)],
+    ),
+    (
+        "inplace fault dru",
+        [
+            ["KPY", "make_fault.py", "rules", T1100, "f.kicad_pcb"],
+            ["WRITE", "f.kicad_dru", "(version 1)\n"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [
+            (r"this board has custom rules f\.kicad_dru; give clearance_mm$", True),
+            (r"^# rules", False),
+        ],
     ),
     (
         "inplace toc_1100 t_um 70",

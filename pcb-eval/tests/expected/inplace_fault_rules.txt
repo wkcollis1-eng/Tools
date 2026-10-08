@@ -1,0 +1,20 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+rules: clearance 0.25, hole-to-hole 0.30, copper-to-edge 0.60 mm
+-- stderr
+
+== step 2: RUN inplace exit 0
+-- stdout
+copper 35 um: stackup, F.Cu and B.Cu 35 um
+# rules: clearance 0.250 mm (board design settings) copper-to-edge 0.600 mm (board design settings)
+21.65,58.34,21.65,64.42  L  6.08  w 2.90  max in-place  3.16 mm  limit U5.4                    R  1.03 mohm
+37.46,51.86,33.57,55.75  L  5.50  w 2.95  max in-place  3.40 mm  limit via GND@35.60,56.90     R  0.92 mohm
+37.46,31.60,37.46,35.00  L  3.40  w 2.95  max in-place  2.98 mm  limit U2.6                    R  0.57 mohm
+33.57,55.75,24.24,55.75  L  9.33  w 2.90  max in-place  3.13 mm  limit U4.5                    R  1.58 mohm
+37.46,35.00,37.46,51.00  L 16.00  w 4.00  max in-place  4.42 mm  limit via GND@35.05,33.65     R  1.97 mohm
+22.40,65.30,21.66,64.35  L  1.21  w 2.95  max in-place  3.30 mm  limit U5.4                    R  0.20 mohm
+24.33,67.09,22.80,65.68  L  2.08  w 3.05  max in-place  3.47 mm  limit U5.4                    R  0.34 mohm
+24.24,55.75,21.65,58.34  L  3.67  w 2.90  max in-place  3.18 mm  limit U1.GPIO10               R  0.62 mohm
+-- stderr
+
+== files
