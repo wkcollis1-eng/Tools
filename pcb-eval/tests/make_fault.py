@@ -6,6 +6,10 @@ usage: make_fault.py <kind> <in.kicad_pcb> <out.kicad_pcb> [REF]
             "no GND via or pad".
   pastedge  move footprint REF so its centre sits on the right board edge. outlines.py must flag it.
   drill     set the first via's drill (sorted by position) to 0.20 mm. fabcheck.py must FAIL it.
+  rules     set the Default netclass clearance to 0.25, hole-to-hole to 0.30 and copper-to-edge to 0.60 mm
+            (a board with other rules). viamove.py must print and apply them.
+  netclass  add netclass Power, clearance 0.30 mm, for net REF. viamove.py must refuse the board.
+SaveBoard also writes the .kicad_pro beside <out>, which carries the rules and netclasses.
 Written 2026-10-08 for the pcb-eval regression suite."""
 
 import os
@@ -46,6 +50,19 @@ elif kind == "drill":
     )[0]
     v.SetDrill(pcbnew.FromMM(0.2))
     print(f"drill: via at {mm(v.GetX()):.2f},{mm(v.GetY()):.2f} set to 0.20 mm")
+elif kind == "rules":
+    ds = b.GetDesignSettings()
+    ds.m_NetSettings.GetDefaultNetclass().SetClearance(pcbnew.FromMM(0.25))
+    ds.m_HoleToHoleMin = pcbnew.FromMM(0.3)
+    ds.m_CopperEdgeClearance = pcbnew.FromMM(0.6)
+    print("rules: clearance 0.25, hole-to-hole 0.30, copper-to-edge 0.60 mm")
+elif kind == "netclass":
+    ns = b.GetDesignSettings().m_NetSettings
+    nc = pcbnew.NETCLASS("Power")
+    nc.SetClearance(pcbnew.FromMM(0.3))
+    ns.SetNetclass("Power", nc)
+    ns.SetNetclassPatternAssignment(sys.argv[4], "Power")
+    print(f"netclass: Power, clearance 0.30 mm, for net {sys.argv[4]}")
 else:
     sys.exit(f"unknown kind {kind!r}")
 pcbnew.SaveBoard(dst, b)

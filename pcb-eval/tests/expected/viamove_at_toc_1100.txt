@@ -1,0 +1,10 @@
+== step 1: WRITE ops.txt
+== step 2: RUN viamove exit 0
+-- stdout
+# rules: clearance 0.200 hole-to-hole 0.250 copper-to-edge 0.500 mm (board design settings)
+at 14.50,21.00 -> 14.35,21.00: legal
+at 14.50,21.00 -> 14.50,28.93: legal
+at 14.50,21.00 -> 30.00,57.98: trk Batt_SW 0.032; trk Batt_SW 0.007; pad U4.4 -0.090; pad U4.4 -0.090; fill F.Cu 0/16 centre out; fill B.Cu 0/16 centre out
+-- stderr
+
+== files

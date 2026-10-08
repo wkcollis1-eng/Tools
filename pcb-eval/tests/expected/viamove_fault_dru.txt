@@ -1,0 +1,13 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+rules: clearance 0.25, hole-to-hole 0.30, copper-to-edge 0.60 mm
+-- stderr
+
+== step 2: WRITE f.kicad_dru
+== step 3: WRITE ops.txt
+== step 4: RUN viamove exit 1
+-- stdout
+
+-- stderr
+viamove applies one clearance (0.25 mm) to every net and no custom rules; this board has custom rules f.kicad_dru
+== files

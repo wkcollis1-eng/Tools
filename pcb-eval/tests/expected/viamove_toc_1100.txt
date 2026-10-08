@@ -1,6 +1,7 @@
 == step 1: WRITE ops.txt
 == step 2: RUN viamove exit 0
 -- stdout
+# rules: clearance 0.200 hole-to-hole 0.250 copper-to-edge 0.500 mm (board design settings)
 via=35.60,56.90:35.65,56.95   # GND moved 0.071 mm; was hit by fill B.Cu 10/16 (was in fill)
 -- stderr
 

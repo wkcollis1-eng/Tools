@@ -7,9 +7,9 @@ usage: python tests/run_tests.py [--record] [NAME ...]
 
 Each case runs its steps in an empty temporary directory and records every step's exit code, stdout and
 stderr, and the sha256 of its named output files. Paths, CRLF, trailing blanks and wx's "duplicate image
-handler" lines are normalised first. A case may also name patterns its last stdout must or must not
-contain: the fault cases use them to show a check fires on a known fault and stays silent on the clean
-board, and --record refuses to write a case whose patterns fail. Fixtures: fixtures/SOURCES.md.
+handler" lines are normalised first. A case may also name patterns its last step's stdout and stderr must
+or must not contain: the fault cases use them to show a check fires on a known fault and stays silent on
+the clean board, and --record refuses to write a case whose patterns fail. Fixtures: fixtures/SOURCES.md.
 Written 2026-10-08."""
 
 import hashlib
@@ -45,6 +45,15 @@ OSH_DRILL = [
 ]
 ISL_CUT = r"GND vias 0  GND pads \[\]  <- no GND via or pad$"  # islands.py's tag for a cut-off island
 U1_PAST = r"^U1 .*\n(?:    .*\n)*?    F\.Fab .* PAST EDGE "  # U1's own block, which make_fault.py moves
+VM_RULES = r"^# rules: clearance %.3f hole-to-hole %.3f copper-to-edge %.3f mm "  # read from the board
+# viamove at= spots for the via at 14.50,21.00, each legal under toc_1100's 0.2/0.25/0.5 and not under the
+# 0.25/0.30/0.60 of "make_fault.py rules": copper 0.55 mm inside the left edge; hole 0.275 mm from via
+# 14.50,29.50's (0.575 - 0.15 - 0.15); copper 0.225 mm from the 3.40 mm VIN+ (57.975 - 55.75 - 1.70 - 0.30).
+VM_AT = [
+    "at=14.50,21.00:14.35,21.00",
+    "at=14.50,21.00:14.50,28.925",
+    "at=14.50,21.00:30.00,57.975",
+]
 DUMP_SAME = [
     (r"^edge True ", True),
     (r"^fps added \[\] removed \[\]$", True),
@@ -53,7 +62,7 @@ DUMP_SAME = [
     (r"CHANGED|NEW|ADDED|REMOVED|^  [+-] track|^ zone (?!same)", False),
 ]
 
-# name, steps, output files, [(regex, must match)] on the last step's stdout.
+# name, steps, output files, [(regex, must match)] on the last step's stdout and stderr.
 # A step is ["RUN", tool, args...], ["KPY", script in tests/, args...], ["CLI", args...] or ["WRITE", file, text].
 CASES = [
     ("dump toc_1100", [["RUN", "dump", T1100, "o.json"]], ["o.json"], []),
@@ -129,7 +138,60 @@ CASES = [
         "viamove toc_1100",
         [["WRITE", "ops.txt", WIDE + "\n"], ["RUN", "viamove", T1100, "ops.txt"]],
         [],
+        [(VM_RULES % (0.200, 0.250, 0.500), True)],
+    ),
+    (
+        "viamove at toc_1100",
+        [
+            ["WRITE", "ops.txt", WIDE + "\n"],
+            ["RUN", "viamove", T1100, "ops.txt", *VM_AT],
+        ],
         [],
+        [
+            (r"-> 14\.35,21\.00: legal$", True),
+            (r"-> 14\.50,28\.93: legal$", True),
+            (r"trk VIN\+ ", False),
+        ],
+    ),
+    (
+        "viamove fault rules",
+        [
+            ["KPY", "make_fault.py", "rules", T1100, "f.kicad_pcb"],
+            ["WRITE", "ops.txt", WIDE + "\n"],
+            ["RUN", "viamove", "f.kicad_pcb", "ops.txt"],
+            ["RUN", "viamove", "f.kicad_pcb", "ops.txt", *VM_AT],
+        ],
+        [],
+        [
+            (VM_RULES % (0.250, 0.300, 0.600), True),
+            (r"-> 14\.35,21\.00: edge$", True),
+            (r"-> 14\.50,28\.93: hole via@14\.50,29\.50$", True),
+            (r"-> 30\.00,57\.98: .*trk VIN\+ 0\.225", True),
+        ],
+    ),
+    (
+        "viamove fault netclass",
+        [
+            ["KPY", "make_fault.py", "netclass", T1100, "f.kicad_pcb", "VIN+"],
+            ["WRITE", "ops.txt", WIDE + "\n"],
+            ["RUN", "viamove", "f.kicad_pcb", "ops.txt"],
+        ],
+        [],
+        [
+            (r"this board has netclass Power clearance 0\.3 mm$", True),
+            (r"^# rules", False),
+        ],
+    ),
+    (
+        "viamove fault dru",
+        [
+            ["KPY", "make_fault.py", "rules", T1100, "f.kicad_pcb"],
+            ["WRITE", "f.kicad_dru", "(version 1)\n"],
+            ["WRITE", "ops.txt", WIDE + "\n"],
+            ["RUN", "viamove", "f.kicad_pcb", "ops.txt"],
+        ],
+        [],
+        [(r"this board has custom rules f\.kicad_dru$", True), (r"^# rules", False)],
     ),
     (
         "drcset 1709 vs 1100",
@@ -226,16 +288,17 @@ def run_case(steps, outs):
             p = subprocess.run(
                 command(step), cwd=tmp, capture_output=True, timeout=1800
             )
-            last = norm(p.stdout, tmp)
+            out, err = norm(p.stdout, tmp), norm(p.stderr, tmp)
+            last = out + "\n" + err  # what the patterns read: a refusal goes to stderr
             label = (
                 " ".join(step[:2]) if step[0] != "CLI" else "CLI " + " ".join(step[1:3])
             )
             parts += [
                 f"== step {i}: {label} exit {p.returncode}",
                 "-- stdout",
-                last,
+                out,
                 "-- stderr",
-                norm(p.stderr, tmp),
+                err,
             ]
         parts.append("== files")
         for o in outs:

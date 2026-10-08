@@ -1,0 +1,12 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+netclass: Power, clearance 0.30 mm, for net VIN+
+-- stderr
+
+== step 2: WRITE ops.txt
+== step 3: RUN viamove exit 1
+-- stdout
+
+-- stderr
+viamove applies one clearance (0.2 mm) to every net and no custom rules; this board has netclass Power clearance 0.3 mm
+== files

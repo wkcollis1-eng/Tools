@@ -1,0 +1,21 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+rules: clearance 0.25, hole-to-hole 0.30, copper-to-edge 0.60 mm
+-- stderr
+
+== step 2: WRITE ops.txt
+== step 3: RUN viamove exit 0
+-- stdout
+# rules: clearance 0.250 hole-to-hole 0.300 copper-to-edge 0.600 mm (board design settings)
+via=35.60,56.90:35.65,56.95   # GND moved 0.071 mm; was hit by fill B.Cu 10/16 (was in fill)
+-- stderr
+
+== step 4: RUN viamove exit 0
+-- stdout
+# rules: clearance 0.250 hole-to-hole 0.300 copper-to-edge 0.600 mm (board design settings)
+at 14.50,21.00 -> 14.35,21.00: edge
+at 14.50,21.00 -> 14.50,28.93: hole via@14.50,29.50
+at 14.50,21.00 -> 30.00,57.98: trk Batt_SW 0.032; trk Batt_SW 0.007; trk VIN+ 0.225; pad U4.4 -0.090; pad U4.4 -0.090; fill F.Cu 0/16 centre out; fill B.Cu 0/16 centre out
+-- stderr
+
+== files
