@@ -1,0 +1,11 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: 35,70
+-- stderr
+
+== step 2: RUN inplace exit 1
+-- stdout
+
+-- stderr
+copper: F.Cu 35 um and B.Cu 70 um differ; these tools give both layers one thickness; give t_um=N
+== files

@@ -87,7 +87,45 @@ CASES = [
         [],
         OSH_DRILL,
     ),
-    ("inplace toc_1100", [["RUN", "inplace", T1100, "VIN+", "B.Cu"]], [], []),
+    (
+        "inplace toc_1100",
+        [["RUN", "inplace", T1100, "VIN+", "B.Cu"]],
+        [],
+        [(CU_STACK % {"t": 35}, True)],
+    ),
+    (
+        "inplace toc_1100 t_um 70",
+        [["RUN", "inplace", T1100, "VIN+", "B.Cu", "t_um=70"]],
+        [],
+        [(r"^copper 70 um: t_um=$", True)],
+    ),
+    (
+        "inplace fault copper 70",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [(CU_STACK % {"t": 70}, True)],
+    ),
+    (
+        "inplace fault copper mixed",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [(CU_MIXED, True), (r" mohm$", False)],
+    ),
+    (
+        "inplace fault copper none",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
+            ["RUN", "inplace", "f.kicad_pcb", "VIN+", "B.Cu"],
+        ],
+        [],
+        [(CU_NONE, True)],
+    ),
     ("islands toc_1100", [["RUN", "islands", T1100]], [], [(ISL_CUT, False)]),
     ("islands ups_tht", [["RUN", "islands", UT]], [], [(ISL_CUT, False)]),
     (

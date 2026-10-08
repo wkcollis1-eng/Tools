@@ -45,7 +45,7 @@ from scipy.sparse.csgraph import connected_components
 sys.path.insert(0, str(FsPath(__file__).resolve().parent.parent / "common"))
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
-RHO = 1.724e-8  # ohm.m, annealed copper at 20 C
+RHO = copper.RHO  # ohm.m, annealed copper at 20 C (one copy, in common/copper.py)
 LAY = {"F.Cu": 0, "B.Cu": 1}
 
 

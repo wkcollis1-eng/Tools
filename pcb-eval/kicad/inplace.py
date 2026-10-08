@@ -1,20 +1,35 @@
 """Widest in-place width for each track of NET on LAYER (KiCad python). 2026-10-06, session 4dcbc5e4.
-usage: inplace.py <board> <NET> <LAYER> [clearance_mm=0.2] [edge_mm=0.5] [novia=GND]
+usage: inplace.py <board> <NET> <LAYER> [clearance_mm=0.2] [edge_mm=0.5] [novia=GND] [t_um=N]
 novia=NET leaves that net's vias out of the obstacles: the width a segment could reach if they moved (viamove.py).
+R uses the board's copper thickness, from its stackup (common/copper.py), printed first; t_um=N overrides it.
+Until 2026-10-08 it was RS = 0.4926 mohm/sq (35 um), fixed.
 Exact over the whole segment, end caps included (corridor.py samples the interior only and skips 1.5 mm at
 each end, so it missed GND vias and U4 pads there: DRC caught 7 errors on its widths). Obstacles: other-net
 pad outlines on LAYER (real polygons), other-net vias, other-net tracks on LAYER, NPTH holes, board edge.
 The GND pour is ignored (it reflows). Width = 2 x (nearest obstacle - clearance). DRC remains the gate."""
 
 import math
+import os
 import sys
 import pcbnew
+
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
+)
+import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 brd, NET, LAYER = sys.argv[1], sys.argv[2], sys.argv[3]
 pos = [a for a in sys.argv[4:] if "=" not in a]
 NOVIA = {a[6:] for a in sys.argv[4:] if a.startswith("novia=")}
+T_UM = next((float(a[5:]) for a in sys.argv[4:] if a.startswith("t_um=")), None)
 CLR = float(pos[0]) if len(pos) > 0 else 0.2
 EDGE = float(pos[1]) if len(pos) > 1 else 0.5
+try:
+    t_cu, line = copper.thickness(open(brd, encoding="utf-8").read(), T_UM, "t_um=")
+except ValueError as e:
+    sys.exit(f"copper: {e}; give t_um=N")
+print(line)
 b = pcbnew.LoadBoard(brd)
 u = 1e6
 lid = b.GetLayerID(LAYER)
@@ -112,7 +127,7 @@ ex0, ey0, ex1, ey1 = (
     bb.GetBottom() / u,
 )
 
-RS = 0.4926
+RS = copper.RHO / t_cu * 1e3  # mohm/sq; was 0.4926, the 35 um value rounded to 4 dp
 for t in b.GetTracks():
     if t.GetClass() != "PCB_TRACK" or t.GetNetname() != NET or t.GetLayer() != lid:
         continue

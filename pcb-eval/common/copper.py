@@ -6,6 +6,7 @@ the board text is the only reader. Written 2026-10-08: until then every tool ass
 
 import re
 
+RHO = 1.724e-8  # ohm.m, annealed copper at 20 C
 ASSUMED = 35e-6  # m: what every tool assumed before 2026-10-08; used only when a board declares no stackup
 COPPER = re.compile(r'\(layer "([^"]+)"\s*\(type "copper"\)\s*\(thickness ([0-9.]+)')
 
@@ -36,9 +37,10 @@ def outer(text):
     return um["F.Cu"] * 1e-6, f"stackup, F.Cu and B.Cu {um['F.Cu']:g} um"
 
 
-def thickness(text, t_um=None):
-    """(thickness in m, the line a tool prints first): t_um (the tool's --t-um) if given, else outer(text).
+def thickness(text, t_um=None, option="--t-um"):
+    """(thickness in m, the line a tool prints first): t_um (given by the tool's option) if not None, else
+    outer(text).
 
     ValueError as outer(). One copy of that line, so every tool states its copper the same way."""
-    t, why = (t_um * 1e-6, "--t-um") if t_um is not None else outer(text)
+    t, why = (t_um * 1e-6, option) if t_um is not None else outer(text)
     return t, f"copper {t * 1e6:g} um: {why}"
