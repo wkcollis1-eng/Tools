@@ -4,6 +4,8 @@
 
 PowerShell utility scripts for managing the wkcollis1-eng GitHub repositories and Home Assistant Green deployment from a Windows PC.
 
+`pcb-eval\` is separate: Python tools for reviewing KiCad board revisions. See [pcb-eval/README.md](pcb-eval/README.md).
+
 **Repos managed:**
 - `home-assistant-config`
 - `Residential-HVAC-Performance-Baseline-`
@@ -949,6 +951,7 @@ C:\repos\
 │   ├── list-issues.ps1
 │   ├── validate-all.ps1
 │   ├── monthly-update.ps1
+│   ├── pcb-eval\                   ← KiCad board review tools, Python (see pcb-eval\README.md)
 │   └── issues\                     ← local issue drafts
 │       ├── TEMPLATE.md
 │       └── ...

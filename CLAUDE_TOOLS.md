@@ -29,6 +29,7 @@
 | add HA script | edit `$deployMap` in `deploy-to-ha.ps1` |
 | bootstrap | `.\bootstrap.ps1` |
 | pre-commit hooks | `.\install-precommit-all.ps1 [-UpdateOnly]` |
+| PCB review tools | `python pcb-eval\run.py --list` · `python pcb-eval\run.py <tool> [args]` (see `pcb-eval\README.md`; not deployed to HA) |
 
 ---
 
