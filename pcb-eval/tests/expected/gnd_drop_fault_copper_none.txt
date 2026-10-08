@@ -1,6 +1,11 @@
-== step 1: RUN gnd_drop exit 0
+== step 1: KPY make_fault.py exit 0
 -- stdout
-copper 35 um: stackup, F.Cu and B.Cu 35 um
+copper: none
+-- stderr
+
+== step 2: RUN gnd_drop exit 0
+-- stdout
+copper 35 um: no stackup in the board, 35 um assumed
 h=0.1 mm  t=35 um  Rs=0.4926 mohm/sq  barrel=0.00 mohm  cells F=128826 B=158082  unknowns=273100  components=1  solve {t}s
 source TB2.2@(16.79,24.50)  sink TB1.1@(17.50,68.50)
   TB2.2@(16.79,24.50)                  1.9645 mohm

@@ -1,0 +1,14 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+copper: 35,70
+-- stderr
+
+== step 2: RUN gnd_drop exit 2
+-- stdout
+
+-- stderr
+usage: gnd_drop.py [-h] [--h H] [--barrel-mohm BARREL_MOHM] [--t-um T_UM]
+                   [--self-test]
+                   [board]
+gnd_drop.py: error: copper: F.Cu 35 um and B.Cu 70 um differ; these tools give both layers one thickness; give --t-um
+== files

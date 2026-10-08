@@ -9,15 +9,41 @@ usage: make_fault.py <kind> <in.kicad_pcb> <out.kicad_pcb> [REF]
   rules     set the Default netclass clearance to 0.25, hole-to-hole to 0.30 and copper-to-edge to 0.60 mm
             (a board with other rules). viamove.py must print and apply them.
   netclass  add netclass Power, clearance 0.30 mm, for net REF. viamove.py must refuse the board.
+  copper    set the stackup's F.Cu and B.Cu thickness: REF is "70" (both, um), "35,70" (F, B) or "none"
+            (remove the stackup). Edits the text: KiCad 10's Python does not wrap the stackup. The tools
+            that read common/copper.py must follow it, refuse "35,70", and say "assumed" for "none".
 SaveBoard also writes the .kicad_pro beside <out>, which carries the rules and netclasses.
 Written 2026-10-08 for the pcb-eval regression suite."""
 
 import os
+import re
 import sys
 
 import pcbnew
 
 kind, src, dst = sys.argv[1:4]
+if kind == "copper":
+    text = open(src, encoding="utf-8", newline="").read()
+    i = text.index("(stackup")
+    if sys.argv[4] == "none":
+        depth, j = 0, i
+        while depth or j == i:  # to the parenthesis that closes (stackup
+            depth += {"(": 1, ")": -1}.get(text[j], 0)
+            j += 1
+        text, n = text[:i] + text[j:], 1
+    else:
+        um = dict(zip(("F.Cu", "B.Cu"), (sys.argv[4].split(",") * 2)[:2]))
+        tail, n = re.subn(
+            r'(\(layer "(F\.Cu|B\.Cu)"\s*\(type "copper"\)\s*\(thickness )[0-9.]+',
+            lambda m: m.group(1) + f"{float(um[m.group(2)]) / 1e3:g}",
+            text[i:],
+        )
+        text = text[:i] + tail
+    if n != (1 if sys.argv[4] == "none" else 2):
+        sys.exit(f"copper: changed {n} stackup layers")
+    open(dst, "w", encoding="utf-8", newline="").write(text)
+    print(f"copper: {sys.argv[4]}")
+    sys.exit()
 b = pcbnew.LoadBoard(src)
 mm = pcbnew.ToMM
 if kind == "island":

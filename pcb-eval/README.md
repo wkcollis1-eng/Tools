@@ -33,6 +33,8 @@ python run.py <tool> [args...]     e.g. python run.py dump board.kicad_pcb dump.
 
 Each tool's docstring gives its own arguments.
 
+`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup.
+
 ## Still tied to one board
 
 These tools were copied as they were. The board-specific values are moving to a profile file beside each board, one tool at a time. Until then:
@@ -42,8 +44,9 @@ These tools were copied as they were. The board-specific values are moving to a 
   - `solve/gnd_drop.py`'s pad set (design doc §7.3).
 - **Read from the board (2026-10-08):**
   - `kicad/viamove.py`'s clearance, hole-to-hole and copper-to-edge come from the board's design settings, and it prints them on its first line. It refuses a board that has a netclass with another clearance or a `.kicad_dru`, because it applies one clearance to every net and no custom rules. Until then they were the Top Off Charger's `0.2, 0.25, 0.5`, hard-coded.
+  - `solve/gnd_drop.py`'s copper thickness comes from the board's stackup (`common/copper.py`), and it prints it on its first line. It refuses a board whose F.Cu and B.Cu differ, and says "35 um assumed" for a board with no stackup. `--t-um` overrides it. Until then it was 35 µm unless given.
 - **All boards, as an assumption:**
-  - 1 oz copper (35 µm), fixed in `tracknet.py`, `inplace.py` and `netdrop.py`. `gnd_drop.py` takes the thickness as an argument, default 35 µm.
+  - 1 oz copper (35 µm), fixed in `tracknet.py`, `inplace.py` and `netdrop.py`.
   - The ground net is named `GND`, in `islands.py`, `padconn.py` and `gnd_drop.py`.
   - `tracknet.py` treats vias as ideal links, because its track keys ignore the layer. Add each via barrel's resistance by hand.
 
@@ -67,7 +70,8 @@ The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOU
 - a 0.20 mm via drill;
 - a ground island with its vias deleted;
 - a module moved past the board edge;
-- other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove).
+- other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove);
+- 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop).
 
 Each fault case names a pattern its output must contain. The clean case beside it must not contain that pattern. `--record` will not write a case whose patterns fail.
 

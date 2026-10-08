@@ -52,6 +52,10 @@ VM_RULES = r"^# rules: clearance %.3f hole-to-hole %.3f copper-to-edge %.3f mm "
 # viamove at= spots for the via at 14.50,21.00, each legal under toc_1100's 0.2/0.25/0.5 and not under the
 # 0.25/0.30/0.60 of "make_fault.py rules": copper 0.55 mm inside the left edge; hole 0.275 mm from via
 # 14.50,29.50's (0.575 - 0.15 - 0.15); copper 0.225 mm from the 3.40 mm VIN+ (57.975 - 55.75 - 1.70 - 0.30).
+# common/copper.py's answer, as each tool that reads it prints it
+CU_STACK = r"^copper %(t)d um: stackup, F\.Cu and B\.Cu %(t)d um$"
+CU_MIXED = r"copper: F\.Cu 35 um and B\.Cu 70 um differ; these tools give both layers one thickness"
+CU_NONE = r"^copper 35 um: no stackup in the board, 35 um assumed$"
 VM_AT = [
     "at=14.50,21.00:14.35,21.00",
     "at=14.50,21.00:14.50,28.925",
@@ -245,7 +249,39 @@ CASES = [
         [],
         [(r"SELF-TEST PASSED", True)],
     ),
-    ("gnd_drop toc_1100", [["RUN", "gnd_drop", T1100, "--h", "0.1"]], [], []),
+    (
+        "gnd_drop toc_1100",
+        [["RUN", "gnd_drop", T1100, "--h", "0.1"]],
+        [],
+        [(CU_STACK % {"t": 35}, True), (r"  t=35 um  ", True)],
+    ),
+    (
+        "gnd_drop fault copper 70",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_STACK % {"t": 70}, True), (r"  t=70 um  ", True)],
+    ),
+    (
+        "gnd_drop fault copper mixed",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_MIXED, True), (r"^whole pour ", False)],
+    ),
+    (
+        "gnd_drop fault copper none",
+        [
+            ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+        ],
+        [],
+        [(CU_NONE, True), (r"  t=35 um  ", True)],
+    ),
     (
         "gnd_drop self-test",
         [["RUN", "gnd_drop", "--self-test"]],

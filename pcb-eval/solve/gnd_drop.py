@@ -18,8 +18,11 @@ leaves out the modules, socket contacts, solder joints and temperature.
 
 usage:
   python gnd_drop.py "Top Off Charger- Oct 2026.kicad_pcb" [--h 0.1]
-                     [--barrel-mohm 0] [--t-um 35]
+                     [--barrel-mohm 0] [--t-um N]
   python gnd_drop.py --self-test
+
+The copper thickness is the board's own, from its stackup (common/copper.py), and
+is printed first; --t-um overrides it. Until 2026-10-08 it was 35 um unless given.
 
 --self-test solves a uniform 20 x 100 mm strip against its exact resistance, and
 checks that a pour cut in two, and a board with no TB2, are refused rather than
@@ -38,6 +41,9 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from matplotlib.path import Path
 from scipy.sparse.csgraph import connected_components
+
+sys.path.insert(0, str(FsPath(__file__).resolve().parent.parent / "common"))
+import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 RHO = 1.724e-8  # ohm.m, annealed copper at 20 C
 LAY = {"F.Cu": 0, "B.Cu": 1}
@@ -389,8 +395,8 @@ def main():
     ap.add_argument(
         "--t-um",
         type=float,
-        default=35.0,
-        help="copper thickness, um (default 35 = 1 oz)",
+        default=None,
+        help="copper thickness, um (default: the board's stackup)",
     )
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
@@ -399,7 +405,15 @@ def main():
     if a.board is None:
         ap.error("the board file is required")
     text = FsPath(a.board).read_text(encoding="utf-8")
-    pads, src, snk, info = solve(text, a.h, a.barrel_mohm * 1e-3, a.t_um * 1e-6)
+    if a.t_um is not None:
+        t_cu, why = a.t_um * 1e-6, "--t-um"
+    else:
+        try:
+            t_cu, why = copper.outer(text)
+        except ValueError as e:
+            ap.error(f"copper: {e}; give --t-um")
+    print(f"copper {t_cu * 1e6:g} um: {why}")
+    pads, src, snk, info = solve(text, a.h, a.barrel_mohm * 1e-3, t_cu)
     print(info)
     print(f"source {src}  sink {snk}")
     for lab in sorted(pads, key=lambda k: -(pads[k] or 0)):
