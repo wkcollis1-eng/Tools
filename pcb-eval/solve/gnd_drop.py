@@ -21,7 +21,7 @@ leaves out the modules, socket contacts, solder joints and temperature.
 
 usage:
   python gnd_drop.py "Top Off Charger- Oct 2026.kicad_pcb" [--h 0.1]
-                     [--barrel-mohm 0] [--t-um N] [--profile FILE]
+                     [--barrel-mohm 0] [--t-um N] [--profile FILE] [--gnd NAME]
   python gnd_drop.py --self-test
 
 The copper thickness is the board's own, from its stackup (common/copper.py), and
@@ -29,6 +29,8 @@ is printed first; --t-um overrides it. Until 2026-10-08 it was 35 um unless give
 The profile is --profile, else <stem>.pcb-eval.json beside the board, printed
 second; a board with neither is refused. Until 2026-10-08 the pads were TB2, TB1
 and U2.2 for every board.
+The ground net is --gnd, else GND, printed third; a board with no net of that name
+is refused (common/groundnet.py). Until 2026-10-08 GND was assumed.
 
 --self-test solves a uniform 20 x 100 mm strip against its exact resistance, and
 checks that a pour cut in two, and a board with no TB2, are refused rather than
@@ -51,6 +53,7 @@ from scipy.sparse.csgraph import connected_components
 sys.path.insert(0, str(FsPath(__file__).resolve().parent.parent / "common"))
 import boardprofile  # noqa: E402  (one copy of what a board's profile holds)
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
+import groundnet  # noqa: E402  (one copy of how the ground net is named)
 
 RHO = copper.RHO  # ohm.m, annealed copper at 20 C (one copy, in common/copper.py)
 LAY = {"F.Cu": 0, "B.Cu": 1}
@@ -89,6 +92,21 @@ def netname(n):
     return (k[2] if len(k) > 2 else k[1]) if k else ""
 
 
+def zone_net(z):
+    # older files write (net 3) (net_name "GND") on a zone
+    return (kid(z, "net_name") or kid(z, "net") or [None, ""])[1]
+
+
+def net_names(T):
+    """Every net name on the parsed board's pads, tracks, vias and zones, for groundnet.pick()."""
+    pads = {netname(p) for fp in kids(T, "footprint") for p in kids(fp, "pad")}
+    return (
+        pads
+        | {netname(x) for x in kids(T, "segment") + kids(T, "via")}
+        | {zone_net(z) for z in kids(T, "zone")}
+    )
+
+
 def xf(at, x, y):
     ax, ay = float(at[1]), float(at[2])
     th = math.radians(float(at[3]) if len(at) > 3 else 0)
@@ -112,9 +130,9 @@ def pad_prefix(spec):
     return spec[0] + "." if spec[1] is None else f"{spec[0]}.{spec[1]}@"
 
 
-def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
+def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6, gnd="GND"):
     """Return (pads, src, snk, info): pads maps label -> ohm per amp above the sink.
-    ends is (source, sink), each a profile pad (ref, number or None) that must match one GND pad."""
+    ends is (source, sink), each a profile pad (ref, number or None) that must match one pad on net gnd."""
     rs = RHO / t_cu  # ohm per square
     T = parse(board_text)
 
@@ -134,7 +152,7 @@ def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
 
     # 1. zone fills
     for z in kids(T, "zone"):
-        if (kid(z, "net_name") or kid(z, "net") or [None, ""])[1] != "GND":
+        if zone_net(z) != gnd:
             continue
         for fp in kids(z, "filled_polygon"):
             P = np.array(
@@ -147,7 +165,7 @@ def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
 
     # 2. GND tracks
     for s in kids(T, "segment"):
-        if netname(s) != "GND":
+        if netname(s) != gnd:
             continue
         a = np.array([float(v) for v in kid(s, "start")[1:3]])
         b = np.array([float(v) for v in kid(s, "end")[1:3]])
@@ -186,7 +204,7 @@ def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
         at = kid(fp, "at")
         ref = {p[1]: p[2] for p in kids(fp, "property")}.get("Reference")
         for p in kids(fp, "pad"):
-            if netname(p) != "GND":
+            if netname(p) != gnd:
                 continue
             pa = kid(p, "at")
             x, y = xf(at, float(pa[1]), float(pa[2]))
@@ -206,7 +224,7 @@ def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
             cu[0, sj, si] |= m
             cu[1, sj, si] |= m
     for v in kids(T, "via"):
-        if netname(v) != "GND":
+        if netname(v) != gnd:
             continue
         x, y = float(kid(v, "at")[1]), float(kid(v, "at")[2])
         d = float(kid(v, "size")[1])
@@ -434,6 +452,11 @@ def main():
         default=None,
         help="the board's profile json (default: <board stem>.pcb-eval.json beside it)",
     )
+    ap.add_argument(
+        "--gnd",
+        default=None,
+        help="the ground net's name (default GND; refused when the board has no such net)",
+    )
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -451,15 +474,21 @@ def main():
         boardprofile.need(prof, "gnd", ppath, "gnd_drop.py")
     except ValueError as e:
         ap.error(str(e))
-    bad = boardprofile.unknown(prof, pad_ids(parse(text)))
+    T = parse(text)
+    bad = boardprofile.unknown(prof, pad_ids(T))
     if bad:
         ap.error(
             f"profile {ppath} names pads this board does not have: {', '.join(bad)}"
         )
     print(f"profile {ppath} ({how})")
+    try:
+        gnd, gline = groundnet.pick(a.gnd, net_names(T), "--gnd NAME")
+    except ValueError as e:
+        ap.error(str(e))
+    print(gline)
     g = {k: tuple(v) for k, v in prof["gnd"].items()}
     pads, src, snk, info = solve(
-        text, a.h, (g["source"], g["sink"]), a.barrel_mohm * 1e-3, t_cu
+        text, a.h, (g["source"], g["sink"]), a.barrel_mohm * 1e-3, t_cu, gnd
     )
     print(info)
     print(f"source {src}  sink {snk}")

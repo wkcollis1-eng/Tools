@@ -1,5 +1,6 @@
 == step 1: RUN islands exit 0
 -- stdout
+ground net GND (default)
 F.Cu islands 3
   #0 bbox x 7.80-25.35 y 31.08-38.75  holes 0  GND vias 3  GND pads ['U2.2', 'C2.1']
   #1 bbox x 6.67-39.09 y 9.16-34.85  holes 0  GND vias 14  GND pads ['U2.2', 'C3.1']

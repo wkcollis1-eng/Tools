@@ -1,0 +1,15 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+gndname: net GND renamed GNDX
+-- stderr
+
+== step 2: RUN gnd_drop exit 2
+-- stdout
+copper 35 um: stackup, F.Cu and B.Cu 35 um
+profile {F}/toc_1100.pcb-eval.json (given)
+-- stderr
+usage: gnd_drop.py [-h] [--h H] [--barrel-mohm BARREL_MOHM] [--t-um T_UM]
+                   [--profile PROFILE] [--gnd GND] [--self-test]
+                   [board]
+gnd_drop.py: error: this board has no net GND; give --gnd NAME (its nets: +3V3, BATT_RAW, Batt_SW, GNDX, GND_SENSE, GPIO3, GPIO3_LED, GPIO4_SW, SCL, SDA, VIN+, VIN-, V_Fused)
+== files

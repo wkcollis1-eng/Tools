@@ -4,7 +4,7 @@
 copper 35 um: stackup, F.Cu and B.Cu 35 um
 -- stderr
 usage: gnd_drop.py [-h] [--h H] [--barrel-mohm BARREL_MOHM] [--t-um T_UM]
-                   [--profile PROFILE] [--self-test]
+                   [--profile PROFILE] [--gnd GND] [--self-test]
                    [board]
 gnd_drop.py: error: profile p.json names pads this board does not have: TB9
 == files

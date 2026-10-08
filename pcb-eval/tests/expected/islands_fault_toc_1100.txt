@@ -5,6 +5,7 @@ island: removed 1 GND via(s) from F.Cu island #1
 
 == step 2: RUN islands exit 0
 -- stdout
+ground net GND (default)
 F.Cu islands 10
   #0 bbox x 14.00-42.50 y 20.50-97.50  holes 4  GND vias 74  GND pads ['U1.GND', 'U4.2', 'U4.3', 'U4.4', 'U4.9', 'U4.10', 'C4.2', 'C5.1', 'U3.2', 'TB2.2', 'U5.2', 'U5.4', 'TB1.1', 'C3.1', 'C2.1', 'LED.1', 'C1.2']
   #1 bbox x 33.55-42.50 y 95.45-97.50  holes 0  GND vias 0  GND pads []  <- no GND via or pad

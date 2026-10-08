@@ -1,0 +1,11 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+gndname: net GND renamed GNDX
+-- stderr
+
+== step 2: RUN islands exit 1
+-- stdout
+
+-- stderr
+this board has no net GND; give gnd=NAME (its nets: +3V3, BATT_RAW, Batt_SW, GNDX, GND_SENSE, GPIO3, GPIO3_LED, GPIO4_SW, SCL, SDA, VIN+, VIN-, V_Fused)
+== files

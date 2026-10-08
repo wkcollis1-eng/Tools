@@ -79,6 +79,10 @@ DUMP_SAME = [
 TOCP = "{F}/toc_1100.pcb-eval.json"
 PROF_BESIDE = r"^profile \{F\}/toc_1100\.pcb-eval\.json \(beside the board\)$"
 NO_PROF = r"no profile: no \S+\.pcb-eval\.json; write one there or give "
+# common/groundnet.py: GND unless given, and refused when the board has none (make_fault.py gndname)
+GND_DEFAULT = r"^ground net GND \(default\)$"
+GND_GIVEN = r"^ground net GNDX \(given\)$"
+NO_GND = r"this board has no net GND; give "
 with open(os.path.join(F, "toc_1100.pcb-eval.json"), encoding="utf-8") as _f:
     TOC_PROF = json.load(_f)
 # R7: a profile naming a pad the board lacks, one with a misspelt key, and one with a net fewer
@@ -228,8 +232,18 @@ CASES = [
         [],
         [(CU_NONE, True)],
     ),
-    ("islands toc_1100", [["RUN", "islands", T1100]], [], [(ISL_CUT, False)]),
-    ("islands ups_tht", [["RUN", "islands", UT]], [], [(ISL_CUT, False)]),
+    (
+        "islands toc_1100",
+        [["RUN", "islands", T1100]],
+        [],
+        [(ISL_CUT, False), (GND_DEFAULT, True)],
+    ),
+    (
+        "islands ups_tht",
+        [["RUN", "islands", UT]],
+        [],
+        [(ISL_CUT, False), (GND_DEFAULT, True)],
+    ),
     (
         "islands fault toc_1100",
         [
@@ -237,11 +251,34 @@ CASES = [
             ["RUN", "islands", "f.kicad_pcb"],
         ],
         [],
-        [(ISL_CUT, True)],
+        [(ISL_CUT, True), (GND_DEFAULT, True)],
     ),
     # R13 2026-10-08: an "islands fault ups_tht" case, added in 8317005, was removed. Every F.Cu island on
     # ups_tht touches a GND pad, so deleting its vias cuts none off. The old centre test hid that, and the
     # case passed on an island still tied through U2.2 and C2.1.
+    (
+        "islands fault gnd name",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            ["RUN", "islands", "f.kicad_pcb"],
+        ],
+        [],
+        [(r"^" + NO_GND + "gnd=NAME", True), (r"^F\.Cu islands", False)],
+    ),
+    (
+        "islands fault gnd name given",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            ["RUN", "islands", "f.kicad_pcb", "gnd=GNDX"],
+        ],
+        [],
+        # the clean board's 10 F.Cu islands, none cut off
+        [
+            (GND_GIVEN, True),
+            (r"^F\.Cu islands 10$", True),
+            (r"<- no GNDX via or pad", False),
+        ],
+    ),
     (
         "narrow toc_1100",
         [["RUN", "narrow", T1100, "o.kicad_pcb", "1.5", "NONE"]],
@@ -260,8 +297,26 @@ CASES = [
         [],
         [(U1_PAST, True)],
     ),
-    ("padconn toc_1100", [["RUN", "padconn", T1100]], [], []),
-    ("padconn ups_tht", [["RUN", "padconn", UT]], [], []),
+    ("padconn toc_1100", [["RUN", "padconn", T1100]], [], [(GND_DEFAULT, True)]),
+    ("padconn ups_tht", [["RUN", "padconn", UT]], [], [(GND_DEFAULT, True)]),
+    (
+        "padconn fault gnd name",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            ["RUN", "padconn", "f.kicad_pcb"],
+        ],
+        [],
+        [(r"^" + NO_GND + "gnd=NAME", True), (r"^zone ", False)],
+    ),
+    (
+        "padconn fault gnd name given",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            ["RUN", "padconn", "f.kicad_pcb", "gnd=GNDX"],
+        ],
+        [],
+        [(GND_GIVEN, True), (r"^U4\.2 pad: inherit fp: inherit$", True)],
+    ),
     (
         "variant relief+pad",
         [["RUN", "variant", T1100, "o.kicad_pcb", "relief=TB1.1", "pad=TB1.1:2.6"]],
@@ -556,6 +611,7 @@ CASES = [
             (r"  t=35 um  ", True),
             (PROF_BESIDE, True),
             (NO_PROF, False),
+            (GND_DEFAULT, True),
             # the Kelvin layout has no GND pad U2.2: said, no longer skipped in silence (O16)
             (
                 r"^R_shared   not solved: the profile's gnd\.shared U2\.2 matches 0 GND pads \[\], not 1$",
@@ -607,6 +663,35 @@ CASES = [
             (r"names pads this board does not have: TB9$", True),
             (r"^whole pour ", False),
         ],
+    ),
+    (
+        "gnd_drop fault gnd name",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
+        ],
+        [],
+        [(NO_GND + "--gnd NAME", True), (r"^whole pour ", False)],
+    ),
+    (
+        "gnd_drop fault gnd name given",
+        [
+            ["KPY", "make_fault.py", "gndname", T1100, "f.kicad_pcb", "GNDX"],
+            [
+                "RUN",
+                "gnd_drop",
+                "f.kicad_pcb",
+                "--h",
+                "0.1",
+                "--profile",
+                TOCP,
+                "--gnd",
+                "GNDX",
+            ],
+        ],
+        [],
+        # the clean board's figure: the same copper under another name
+        [(GND_GIVEN, True), (r"^whole pour .* = 1\.9645 mohm$", True)],
     ),
     (
         "gnd_drop self-test",

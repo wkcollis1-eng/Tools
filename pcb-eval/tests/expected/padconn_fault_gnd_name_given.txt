@@ -1,8 +1,13 @@
-== step 1: RUN padconn exit 0
+== step 1: KPY make_fault.py exit 0
 -- stdout
-ground net GND (default)
-zone GND ['F.Cu', 'B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
-zone GND ['B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
+gndname: net GND renamed GNDX
+-- stderr
+
+== step 2: RUN padconn exit 0
+-- stdout
+ground net GNDX (given)
+zone GNDX ['F.Cu', 'B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
+zone GNDX ['B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
 U1.GND pad: inherit fp: inherit
 U4.2 pad: inherit fp: inherit
 U4.3 pad: inherit fp: inherit

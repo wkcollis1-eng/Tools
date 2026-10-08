@@ -33,7 +33,7 @@ python run.py <tool> [args...]     e.g. python run.py dump board.kicad_pcb dump.
 
 Each tool's docstring gives its own arguments.
 
-`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup. `rules.py` reads the design rules from a board that a `kicad/` tool has loaded; it is handed the board, so it imports nothing from KiCad. `boardprofile.py` reads and checks a board's profile.
+`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup. `rules.py` reads the design rules from a board that a `kicad/` tool has loaded; it is handed the board, so it imports nothing from KiCad. `boardprofile.py` reads and checks a board's profile. `groundnet.py` names the ground net and checks that the board has it.
 
 ## Profiles
 
@@ -72,8 +72,8 @@ These tools were copied as they were. What was tied to one board is now read fro
   - `kicad/inplace.py`'s clearance and copper-to-edge come from the same reading (`common/rules.py`), printed on its second line. It refuses the same boards unless given `clearance_mm`. Until then they defaulted to the Top Off Charger's `0.2` and `0.5`.
   - The copper thickness in `solve/gnd_drop.py`, `solve/netdrop.py` and `kicad/inplace.py` comes from the board's stackup (`common/copper.py`), and each prints it on its first line. They refuse a board whose F.Cu and B.Cu differ, and say "35 um assumed" for a board with no stackup. `--t-um` (inplace: `t_um=`) overrides it. Until then gnd_drop used 35 µm unless given, and the other two always did.
   - `kicad/dump.py` records the stackup's copper as `copper_um`, and `solve/tracknet.py` uses each dump's, printing it per board. tracknet refuses a dump without `copper_um` (written before 2026-10-08: re-run `dump.py`) and one whose F.Cu and B.Cu differ. `report/dumpdiff.py` reports a copper change. Until then tracknet used 35 µm.
+- **Given, else `GND`, and checked against the board (2026-10-08):** the ground net in `kicad/islands.py`, `kicad/padconn.py` and `solve/gnd_drop.py`. Give it with `gnd=NAME` (gnd_drop: `--gnd NAME`). Each prints `ground net NAME (default|given)`: first in islands and padconn, after the profile line in gnd_drop. A board with no net of that name is refused, and the refusal lists the board's nets (`common/groundnet.py`). The name is not in the profile, because islands and padconn need no profile. Until then `GND` was assumed. On a board whose ground has another name, islands printed `F.Cu islands 0` and padconn printed the zones and no pads, both with exit 0. gnd_drop stopped with a traceback.
 - **All boards, as an assumption:**
-  - The ground net is named `GND`, in `islands.py`, `padconn.py` and `gnd_drop.py`.
   - `tracknet.py` treats vias as ideal links, because its track keys ignore the layer. Add each via barrel's resistance by hand.
 
 On another board, check these values against its `.kicad_pro` and stackup before reading a figure from these tools.
@@ -97,7 +97,8 @@ The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOU
 - a ground island with its vias deleted;
 - a module moved past the board edge;
 - other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove, inplace);
-- 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop, netdrop, inplace, and dump with dumpdiff and tracknet), and a dump written before `copper_um` existed (dumpdiff, tracknet).
+- 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop, netdrop, inplace, and dump with dumpdiff and tracknet), and a dump written before `copper_um` existed (dumpdiff, tracknet);
+- the ground net renamed `GNDX`, run once without a name and once with `GNDX` given (islands, padconn, gnd_drop). Given the name, each prints the clean board's figures.
 
 Profile faults need no board copy. The case writes the bad profile itself (a key the tools do not know, a pad the board lacks, one net fewer than the other dump's), or runs a board that has none (dump, tracknet, netdrop, gnd_drop).
 

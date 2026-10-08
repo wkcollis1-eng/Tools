@@ -1,5 +1,6 @@
 == step 1: RUN padconn exit 0
 -- stdout
+ground net GND (default)
 zone GND ['F.Cu', 'B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
 zone GND ['B.Cu'] conn thermal clear 500000 spoke 0.5 gap 0.5 minw 0.25
 U1.GND pad: inherit fp: inherit

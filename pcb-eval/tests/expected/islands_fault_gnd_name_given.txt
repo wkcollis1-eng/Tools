@@ -1,0 +1,28 @@
+== step 1: KPY make_fault.py exit 0
+-- stdout
+gndname: net GND renamed GNDX
+-- stderr
+
+== step 2: RUN islands exit 0
+-- stdout
+ground net GNDX (given)
+F.Cu islands 10
+  #0 bbox x 14.00-42.50 y 20.50-97.50  holes 4  GNDX vias 74  GNDX pads ['U1.GND', 'U4.2', 'U4.3', 'U4.4', 'U4.9', 'U4.10', 'C4.2', 'C5.1', 'U3.2', 'TB2.2', 'U5.2', 'U5.4', 'TB1.1', 'C3.1', 'C2.1', 'LED.1', 'C1.2']
+  #1 bbox x 33.55-42.50 y 95.45-97.50  holes 0  GNDX vias 1  GNDX pads []
+  #2 bbox x 31.40-33.06 y 58.36-58.86  holes 0  GNDX vias 0  GNDX pads ['U4.3', 'U4.4']
+  #3 bbox x 33.94-35.60 y 58.36-58.86  holes 0  GNDX vias 0  GNDX pads ['U4.2', 'U4.3']
+  #4 bbox x 28.06-33.46 y 50.97-52.98  holes 0  GNDX vias 2  GNDX pads ['U1.GND']
+  #5 bbox x 32.82-33.87 y 32.34-33.02  holes 0  GNDX vias 1  GNDX pads []
+  #6 bbox x 25.42-26.64 y 32.25-33.00  holes 0  GNDX vias 1  GNDX pads []
+  #7 bbox x 27.96-29.18 y 32.25-33.00  holes 0  GNDX vias 1  GNDX pads []
+  #8 bbox x 30.50-31.94 y 32.14-33.00  holes 0  GNDX vias 1  GNDX pads []
+  #9 bbox x 20.61-32.19 y 26.92-31.10  holes 0  GNDX vias 4  GNDX pads []
+B.Cu islands 5
+  #0 bbox x 31.40-33.06 y 58.36-58.86  holes 0  GNDX vias 0  GNDX pads ['U4.3', 'U4.4']
+  #1 bbox x 33.94-35.60 y 58.36-58.86  holes 0  GNDX vias 0  GNDX pads ['U4.2', 'U4.3']
+  #2 bbox x 26.97-35.48 y 32.14-52.05  holes 0  GNDX vias 8  GNDX pads []
+  #3 bbox x 19.80-28.93 y 32.25-37.25  holes 0  GNDX vias 2  GNDX pads []
+  #4 bbox x 14.00-42.50 y 20.50-97.50  holes 18  GNDX vias 75  GNDX pads ['U1.GND', 'U4.2', 'U4.3', 'U4.4', 'U4.9', 'U4.10', 'C4.2', 'C5.1', 'U3.2', 'TB2.2', 'U5.2', 'U5.4', 'TB1.1', 'C3.1', 'C2.1', 'LED.1', 'C1.2']
+-- stderr
+
+== files

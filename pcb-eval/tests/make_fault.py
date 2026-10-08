@@ -13,6 +13,8 @@ usage: make_fault.py <kind> <in.kicad_pcb> <out.kicad_pcb> [REF]
   copper    set the stackup's F.Cu and B.Cu thickness: REF is "70" (both, um), "35,70" (F, B) or "none"
             (remove the stackup). Edits the text: KiCad 10's Python does not wrap the stackup. The tools
             that read common/copper.py must follow it, refuse "35,70", and say "assumed" for "none".
+  gndname   rename net GND to REF (through pcbnew: pad numbers such as U1's "GND" are not net names).
+            islands.py, padconn.py and gnd_drop.py must refuse it, and with REF given match the clean board.
 SaveBoard also writes the .kicad_pro beside <out>, which carries the rules and netclasses.
 Written 2026-10-08 for the pcb-eval regression suite."""
 
@@ -90,6 +92,9 @@ elif kind == "netclass":
     ns.SetNetclass("Power", nc)
     ns.SetNetclassPatternAssignment(sys.argv[4], "Power")
     print(f"netclass: Power, clearance 0.30 mm, for net {sys.argv[4]}")
+elif kind == "gndname":
+    b.FindNet("GND").SetNetname(sys.argv[4])
+    print(f"gndname: net GND renamed {sys.argv[4]}")
 else:
     sys.exit(f"unknown kind {kind!r}")
 pcbnew.SaveBoard(dst, b)
