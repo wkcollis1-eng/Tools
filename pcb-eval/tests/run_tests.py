@@ -13,6 +13,7 @@ the clean board, and --record refuses to write a case whose patterns fail. Fixtu
 Written 2026-10-08."""
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -74,6 +75,25 @@ DUMP_SAME = [
     (r"CHANGED|NEW|ADDED|REMOVED|^  [+-] track|^ zone (?!same)", False),
 ]
 
+# The one Top Off Charger profile: beside toc_1100, and passed to toc_1709 (same pads) and the fault copies
+TOCP = "{F}/toc_1100.pcb-eval.json"
+PROF_BESIDE = r"^profile \{F\}/toc_1100\.pcb-eval\.json \(beside the board\)$"
+NO_PROF = r"no profile: no \S+\.pcb-eval\.json; write one there or give "
+with open(os.path.join(F, "toc_1100.pcb-eval.json"), encoding="utf-8") as _f:
+    TOC_PROF = json.load(_f)
+# R7: a profile naming a pad the board lacks, one with a misspelt key, and one with a net fewer
+PROF_PAD = json.dumps(
+    {**TOC_PROF, "paths": {**TOC_PROF["paths"], "VIN+": [[["U5", "3"]], [["U9", "7"]]]}}
+)
+PROF_GND = json.dumps({**TOC_PROF, "gnd": {**TOC_PROF["gnd"], "source": ["TB9", None]}})
+PROF_KEY = '{"path": {}}\n'
+PROF_NETS = json.dumps(
+    {
+        **TOC_PROF,
+        "paths": {k: v for k, v in TOC_PROF["paths"].items() if k != "V_Fused"},
+    }
+)
+
 # name, steps, output files, [(regex, must match)] on the last step's stdout and stderr.
 # A step is ["RUN", tool, args...], ["KPY", script in tests/, args...], ["CLI", args...] or ["WRITE", file, text].
 CASES = [
@@ -81,9 +101,17 @@ CASES = [
         "dump toc_1100",
         [["RUN", "dump", T1100, "o.json"]],
         ["o.json"],
-        [(DUMP_CU, True)],
+        [(DUMP_CU, True), (PROF_BESIDE, True)],
     ),
-    ("dump ups_tht", [["RUN", "dump", UT, "o.json"]], ["o.json"], [(DUMP_CU, True)]),
+    (
+        "dump ups_tht",
+        [["RUN", "dump", UT, "o.json"]],
+        ["o.json"],
+        [
+            (DUMP_CU, True),
+            (r"^profile none; tracknet\.py will refuse this dump \(" + NO_PROF, True),
+        ],
+    ),
     (
         "dump fault copper none",
         [
@@ -92,6 +120,15 @@ CASES = [
         ],
         ["o.json"],
         [(r" copper_um None$", True)],
+    ),
+    (
+        "dump fault profile key",
+        [
+            ["WRITE", "p.json", PROF_KEY],
+            ["RUN", "dump", T1100, "o.json", "profile=p.json"],
+        ],
+        [],
+        [(r"^profile p\.json: unknown keys \['path'\]", True), (r"^ok ", False)],
     ),
     ("connsilk toc_1100", [["RUN", "connsilk", T1100, "TB1,TB2,U4"]], [], []),
     ("connsilk ups_tht", [["RUN", "connsilk", UT, "TB1,TB2"]], [], []),
@@ -355,7 +392,7 @@ CASES = [
     (
         "tracknet 1709 vs 1100",
         [
-            ["RUN", "dump", T1709, "a.json"],
+            ["RUN", "dump", T1709, "a.json", "profile=" + TOCP],
             ["RUN", "dump", T1100, "b.json"],
             ["RUN", "tracknet", "a.json", "b.json"],
         ],
@@ -363,6 +400,9 @@ CASES = [
         [
             ("^old: " + CU_STACK[1:] % {"t": 35}, True),
             ("^new: " + CU_STACK[1:] % {"t": 35}, True),
+            (r"^old: profile toc_1100\.pcb-eval\.json \(recorded in the dump\)$", True),
+            (r"^new: profile toc_1100\.pcb-eval\.json \(recorded in the dump\)$", True),
+            (r"^charge path \(excl V_Fused\)\s+old 38\.10  new nan ", True),
         ],
     ),
     (
@@ -370,7 +410,7 @@ CASES = [
         [
             ["RUN", "dump", T1100, "a.json"],
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
-            ["RUN", "dump", "f.kicad_pcb", "b.json"],
+            ["RUN", "dump", "f.kicad_pcb", "b.json", "profile=" + TOCP],
             ["RUN", "tracknet", "a.json", "b.json"],
         ],
         [],
@@ -380,7 +420,7 @@ CASES = [
         "tracknet fault copper mixed",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
-            ["RUN", "dump", "f.kicad_pcb", "a.json"],
+            ["RUN", "dump", "f.kicad_pcb", "a.json", "profile=" + TOCP],
             ["RUN", "tracknet", "a.json", "a.json"],
         ],
         [],
@@ -390,7 +430,7 @@ CASES = [
         "tracknet fault copper none",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
-            ["RUN", "dump", "f.kicad_pcb", "a.json"],
+            ["RUN", "dump", "f.kicad_pcb", "a.json", "profile=" + TOCP],
             ["RUN", "tracknet", "a.json", "a.json"],
         ],
         [],
@@ -409,10 +449,37 @@ CASES = [
         ],
     ),
     (
+        "tracknet fault no profile",
+        [["RUN", "dump", UT, "a.json"], ["RUN", "tracknet", "a.json", "a.json"]],
+        [],
+        [(r"^a\.json: no profile \(dump\.py found none", True), (r"^net ", False)],
+    ),
+    (
+        "tracknet fault profile pad",
+        [
+            ["WRITE", "p.json", PROF_PAD],
+            ["RUN", "dump", T1100, "a.json", "profile=p.json"],
+            ["RUN", "tracknet", "a.json", "a.json"],
+        ],
+        [],
+        [(r"names pads this board does not have: U9\.7$", True), (r"^net ", False)],
+    ),
+    (
+        "tracknet fault profile nets",
+        [
+            ["WRITE", "p.json", PROF_NETS],
+            ["RUN", "dump", T1100, "a.json"],
+            ["RUN", "dump", T1100, "b.json", "profile=p.json"],
+            ["RUN", "tracknet", "a.json", "b.json"],
+        ],
+        [],
+        [(r"profiles name different nets or sums", True), (r"^net ", False)],
+    ),
+    (
         "netdrop toc_1100",
         [["RUN", "netdrop", T1100, "--h", "0.1"]],
         [],
-        [(CU_STACK % {"t": 35}, True)],
+        [(CU_STACK % {"t": 35}, True), (PROF_BESIDE, True), (NO_PROF, False)],
     ),
     (
         "netdrop toc_1100 t-um 70",
@@ -424,7 +491,7 @@ CASES = [
         "netdrop fault copper 70",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
-            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_STACK % {"t": 70}, True)],
@@ -433,7 +500,7 @@ CASES = [
         "netdrop fault copper mixed",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
-            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_MIXED, True), (r" mohm   h=", False)],
@@ -442,10 +509,37 @@ CASES = [
         "netdrop fault copper none",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
-            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "netdrop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_NONE, True)],
+    ),
+    (
+        "netdrop fault no profile",
+        [["RUN", "netdrop", UT, "--h", "0.1"]],
+        [],
+        [(NO_PROF, True), (r" mohm   h=", False)],
+    ),
+    (
+        "netdrop fault profile pad",
+        [
+            ["WRITE", "p.json", PROF_PAD],
+            ["RUN", "netdrop", T1100, "--h", "0.1", "--profile", "p.json"],
+        ],
+        [],
+        [
+            (r"names pads this board does not have: U9\.7$", True),
+            (r" mohm   h=", False),
+        ],
+    ),
+    (
+        "netdrop fault profile key",
+        [
+            ["WRITE", "p.json", PROF_KEY],
+            ["RUN", "netdrop", T1100, "--h", "0.1", "--profile", "p.json"],
+        ],
+        [],
+        [(r"profile p\.json: unknown keys \['path'\]", True), (r" mohm   h=", False)],
     ),
     (
         "netdrop self-test",
@@ -457,13 +551,23 @@ CASES = [
         "gnd_drop toc_1100",
         [["RUN", "gnd_drop", T1100, "--h", "0.1"]],
         [],
-        [(CU_STACK % {"t": 35}, True), (r"  t=35 um  ", True)],
+        [
+            (CU_STACK % {"t": 35}, True),
+            (r"  t=35 um  ", True),
+            (PROF_BESIDE, True),
+            (NO_PROF, False),
+            # the Kelvin layout has no GND pad U2.2: said, no longer skipped in silence (O16)
+            (
+                r"^R_shared   not solved: the profile's gnd\.shared U2\.2 matches 0 GND pads \[\], not 1$",
+                True,
+            ),
+        ],
     ),
     (
         "gnd_drop fault copper 70",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "70"],
-            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_STACK % {"t": 70}, True), (r"  t=70 um  ", True)],
@@ -472,7 +576,7 @@ CASES = [
         "gnd_drop fault copper mixed",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "35,70"],
-            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_MIXED, True), (r"^whole pour ", False)],
@@ -481,10 +585,28 @@ CASES = [
         "gnd_drop fault copper none",
         [
             ["KPY", "make_fault.py", "copper", T1100, "f.kicad_pcb", "none"],
-            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1"],
+            ["RUN", "gnd_drop", "f.kicad_pcb", "--h", "0.1", "--profile", TOCP],
         ],
         [],
         [(CU_NONE, True), (r"  t=35 um  ", True)],
+    ),
+    (
+        "gnd_drop fault no profile",
+        [["RUN", "gnd_drop", UT, "--h", "0.1"]],
+        [],
+        [(NO_PROF, True), (r"^whole pour ", False)],
+    ),
+    (
+        "gnd_drop fault profile pad",
+        [
+            ["WRITE", "p.json", PROF_GND],
+            ["RUN", "gnd_drop", T1100, "--h", "0.1", "--profile", "p.json"],
+        ],
+        [],
+        [
+            (r"names pads this board does not have: TB9$", True),
+            (r"^whole pour ", False),
+        ],
     ),
     (
         "gnd_drop self-test",

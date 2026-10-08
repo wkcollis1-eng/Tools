@@ -1,14 +1,10 @@
-== step 1: KPY make_fault.py exit 0
--- stdout
-copper: 35,70
--- stderr
-
+== step 1: WRITE p.json
 == step 2: RUN netdrop exit 2
 -- stdout
-
+copper 35 um: stackup, F.Cu and B.Cu 35 um
 -- stderr
 usage: netdrop.py [-h] [--h H] [--contact {pad,drill}] [--net [NET ...]]
                   [--t-um T_UM] [--profile PROFILE] [--self-test]
                   [board]
-netdrop.py: error: copper: F.Cu 35 um and B.Cu 70 um differ; these tools give both layers one thickness; give --t-um
+netdrop.py: error: profile p.json: unknown keys ['path']; known: ['about', 'paths', 'total', 'gnd']
 == files

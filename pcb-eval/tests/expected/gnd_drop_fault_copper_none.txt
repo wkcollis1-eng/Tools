@@ -6,6 +6,7 @@ copper: none
 == step 2: RUN gnd_drop exit 0
 -- stdout
 copper 35 um: no stackup in the board, 35 um assumed
+profile {F}/toc_1100.pcb-eval.json (given)
 h=0.1 mm  t=35 um  Rs=0.4926 mohm/sq  barrel=0.00 mohm  cells F=128826 B=158082  unknowns=273100  components=1  solve {t}s
 source TB2.2@(16.79,24.50)  sink TB1.1@(17.50,68.50)
   TB2.2@(16.79,24.50)                  1.9645 mohm
@@ -26,6 +27,7 @@ source TB2.2@(16.79,24.50)  sink TB1.1@(17.50,68.50)
   C5.1@(26.30,94.46)                   0.2199 mohm
   C4.2@(19.80,92.46)                   0.2146 mohm
   TB1.1@(17.50,68.50)                  0.0000 mohm
+R_shared   not solved: the profile's gnd.shared U2.2 matches 0 GND pads [], not 1
 whole pour V(TB2.2@(16.79,24.50)) - V(TB1.1@(17.50,68.50)) = 1.9645 mohm
 -- stderr
 

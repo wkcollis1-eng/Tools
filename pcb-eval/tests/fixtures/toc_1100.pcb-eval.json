@@ -1,0 +1,12 @@
+{
+ "about": "Top Off Charger: tracknet.py's PATHS and gnd_drop.py's TB2/TB1/U2.2 before 2026-10-08, verbatim. The 2026-10-06 17:09 save (toc_1709) has the same pads; its tests pass this file.",
+ "paths": {
+  "BATT_RAW": [[["TB1", null]], [["U4", "11"], ["U4", "12"]]],
+  "Batt_SW": [[["U4", "5"], ["U4", "6"]], [["U5", "1"]]],
+  "VIN+": [[["U5", "3"]], [["U2", "7"]]],
+  "VIN-": [[["U2", "6"]], [["TB2", "1"]]],
+  "V_Fused": [[["F1", "2"]], [["U3", "3"]]]
+ },
+ "total": {"name": "charge path (excl V_Fused)", "nets": ["BATT_RAW", "Batt_SW", "VIN+", "VIN-"]},
+ "gnd": {"source": ["TB2", null], "sink": ["TB1", null], "shared": ["U2", "2"]}
+}

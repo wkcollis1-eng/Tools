@@ -1,6 +1,7 @@
 == step 1: RUN dump exit 0
 -- stdout
 ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 35.0, 'B.Cu': 35.0}
+profile {F}/toc_1100.pcb-eval.json (beside the board)
 -- stderr
 
 == step 2: KPY make_fault.py exit 0
@@ -11,6 +12,7 @@ copper: 70
 == step 3: RUN dump exit 0
 -- stdout
 ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 70.0, 'B.Cu': 70.0}
+profile none; tracknet.py will refuse this dump (no profile: no f.pcb-eval.json; write one there or give profile=FILE)
 -- stderr
 
 == step 4: RUN dumpdiff exit 0

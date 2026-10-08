@@ -1,15 +1,18 @@
-"""Ground-pour voltage drop on the Top Off Charger board (design doc section 7.3).
+"""Ground-pour voltage drop between the profile's GND source and sink pads (first for the Top Off Charger, design doc 7.3).
 
 Finite differences on the rasterised GND copper of a KiCad board file. +1 A goes
-in at TB2's GND pad (pack -) and out at TB1's GND pad (PSU -V, held at 0 V); each
-is found by reference and net, so a layout that renumbers or moves them still
-solves. The potential of every GND pad per amp is printed in milliohms, followed
-by the two figures section 7.3 uses:
+in at the source GND pad and out at the sink GND pad (held at 0 V); each is found
+by reference and net, so a layout that renumbers or moves them still solves. They
+are the board profile's gnd.source and gnd.sink (common/boardprofile.py): on the
+Top Off Charger TB2 (pack -) and TB1 (PSU -V). The potential of every GND pad per
+amp is printed in milliohms, followed by the two figures section 7.3 uses:
 
-  R_shared    V(TB2 GND) - V(U2 pin 2): the pour resistance the charge current
-              shares with the INA228's ground reference, so VBUS reads high by
-              R_shared x I
-  whole pour  V(TB2 GND) - V(TB1 GND)
+  R_shared    V(source) - V(gnd.shared): on the Top Off Charger U2 pin 2, the
+              pour resistance the charge current shares with the INA228's ground
+              reference, so VBUS reads high by R_shared x I. Printed only when
+              the profile has gnd.shared; when that is not exactly one GND pad,
+              the line says so (until 2026-10-08 it was skipped in silence)
+  whole pour  V(source) - V(sink)
 
 The model includes the zone fills as saved in the board file (refill the zones in
 KiCad before saving), the GND tracks, the through-hole GND pads (both layers, each
@@ -18,11 +21,14 @@ leaves out the modules, socket contacts, solder joints and temperature.
 
 usage:
   python gnd_drop.py "Top Off Charger- Oct 2026.kicad_pcb" [--h 0.1]
-                     [--barrel-mohm 0] [--t-um N]
+                     [--barrel-mohm 0] [--t-um N] [--profile FILE]
   python gnd_drop.py --self-test
 
 The copper thickness is the board's own, from its stackup (common/copper.py), and
 is printed first; --t-um overrides it. Until 2026-10-08 it was 35 um unless given.
+The profile is --profile, else <stem>.pcb-eval.json beside the board, printed
+second; a board with neither is refused. Until 2026-10-08 the pads were TB2, TB1
+and U2.2 for every board.
 
 --self-test solves a uniform 20 x 100 mm strip against its exact resistance, and
 checks that a pour cut in two, and a board with no TB2, are refused rather than
@@ -43,6 +49,7 @@ from matplotlib.path import Path
 from scipy.sparse.csgraph import connected_components
 
 sys.path.insert(0, str(FsPath(__file__).resolve().parent.parent / "common"))
+import boardprofile  # noqa: E402  (one copy of what a board's profile holds)
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 RHO = copper.RHO  # ohm.m, annealed copper at 20 C (one copy, in common/copper.py)
@@ -91,8 +98,23 @@ def xf(at, x, y):
     )
 
 
-def solve(board_text, h, r_barrel=0.0, t_cu=35e-6):
-    """Return (pads, src, snk, info): pads maps label -> ohm per amp above the sink."""
+def pad_ids(T):
+    """{(reference, pad number)} of every pad on the parsed board, for boardprofile.unknown()."""
+    return {
+        ({q[1]: q[2] for q in kids(fp, "property")}.get("Reference"), p[1])
+        for fp in kids(T, "footprint")
+        for p in kids(fp, "pad")
+    }
+
+
+def pad_prefix(spec):
+    """The start of every pad label solve() gives the profile pad (ref, number or None)."""
+    return spec[0] + "." if spec[1] is None else f"{spec[0]}.{spec[1]}@"
+
+
+def solve(board_text, h, ends, r_barrel=0.0, t_cu=35e-6):
+    """Return (pads, src, snk, info): pads maps label -> ohm per amp above the sink.
+    ends is (source, sink), each a profile pad (ref, number or None) that must match one GND pad."""
     rs = RHO / t_cu  # ohm per square
     T = parse(board_text)
 
@@ -276,10 +298,17 @@ def solve(board_text, h, r_barrel=0.0, t_cu=35e-6):
     # R13, 2026-10-06: this took pad 2 of each block and called the upper one the
     # source; the 2026-10-06 layout moved TB1's GND to pad 1 and it raised
     # "expected two terminal-block GND pads, found ['TB2.2@(16.79,24.50)']".
-    tb = {r: [k for k in pads if k.startswith(r + ".")] for r in ("TB2", "TB1")}
+    # 2026-10-08: the two blocks are the profile's gnd.source and gnd.sink (ends), which
+    # may name a pad number; a ref alone still means its one GND pad.
+    tb = {
+        boardprofile.label(e): [k for k in pads if k.startswith(pad_prefix(e))]
+        for e in ends
+    }
     if any(len(v) != 1 for v in tb.values()):
-        raise ValueError(f"expected one GND pad on each of TB2 and TB1, found {tb}")
-    src, snk = tb["TB2"][0], tb["TB1"][0]
+        raise ValueError(
+            f"expected one GND pad on each of {' and '.join(tb)}, found {tb}"
+        )
+    src, snk = (tb[boardprofile.label(e)][0] for e in ends)
     ncomp, comp = connected_components(A, directed=False)
     if comp[pads[src]] != comp[pads[snk]]:
         raise NotConnected(
@@ -319,9 +348,11 @@ FILL = '(filled_polygon (layer "B.Cu") (pts (xy 0 {y0}) (xy 20 {y0}) (xy 20 {y1}
 
 
 def self_test():
+    # the strip's source and sink, a profile's gnd.source/sink
+    ENDS = (("TB2", None), ("TB1", None))
     # direction 1: a uniform strip; 79 mm between the pads' inner edges, 20 mm wide
     exact = RHO / 35e-6 * 79 / 20
-    pads, src, _snk, _ = solve(STRIP.format(fills=FILL.format(y0=0, y1=100)), 0.1)
+    pads, src, _snk, _ = solve(STRIP.format(fills=FILL.format(y0=0, y1=100)), 0.1, ENDS)
     got = pads[src]
     err = (got - exact) / exact
     print(
@@ -331,7 +362,7 @@ def self_test():
     # direction 2: the same strip cut in two must be refused, not solved
     cut = FILL.format(y0=0, y1=49.9) + " " + FILL.format(y0=50.1, y1=100)
     try:
-        solve(STRIP.format(fills=cut), 0.1)
+        solve(STRIP.format(fills=cut), 0.1, ENDS)
         print("cut pour: SOLVED - the connectivity check did not fire")
         ok = False
     except NotConnected as e:
@@ -339,7 +370,7 @@ def self_test():
     # direction 3: a board with no TB2 GND pad must be refused, not guessed at
     no_tb2 = STRIP.replace('"TB2"', '"TB1"', 1).format(fills=FILL.format(y0=0, y1=100))
     try:
-        solve(no_tb2, 0.1)
+        solve(no_tb2, 0.1, ENDS)
         print("no TB2: SOLVED - the pad selection did not fire")
         ok = False
     except ValueError as e:
@@ -351,7 +382,7 @@ def self_test():
         ' (at 0 0) (size 0.4 0.4) (layers "F.Cu") (net "GND")))\n (footprint "t" (at 10 10)'
     )
     board = STRIP.replace('(footprint "t" (at 10 10)', tie, 1)
-    pads, src, _snk, _ = solve(board.format(fills=FILL.format(y0=0, y1=100)), 0.1)
+    pads, src, _snk, _ = solve(board.format(fills=FILL.format(y0=0, y1=100)), 0.1, ENDS)
     nt = [k for k in pads if k.startswith("NT1.")]
     if len(nt) == 1 and abs(pads[nt[0]] - pads[src]) < 1e-9:
         print(f"pad inside TB2: reads TB2 ({pads[nt[0]] * 1e3:.4f} mohm)")
@@ -367,7 +398,7 @@ def self_test():
     twin = pad.replace("{n}", "1") + pad.replace("{n}", "2") + " (zone"
     board = STRIP.replace(" (zone", twin, 1)
     try:
-        solve(board.format(fills=FILL.format(y0=0, y1=100)), 0.1)
+        solve(board.format(fills=FILL.format(y0=0, y1=100)), 0.1, ENDS)
         print("coincident pads: SOLVED - the missing-pad check did not fire")
         ok = False
     except ValueError as e:
@@ -398,6 +429,11 @@ def main():
         default=None,
         help="copper thickness, um (default: the board's stackup)",
     )
+    ap.add_argument(
+        "--profile",
+        default=None,
+        help="the board's profile json (default: <board stem>.pcb-eval.json beside it)",
+    )
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -410,7 +446,21 @@ def main():
     except ValueError as e:
         ap.error(f"copper: {e}; give --t-um")
     print(line)
-    pads, src, snk, info = solve(text, a.h, a.barrel_mohm * 1e-3, t_cu)
+    try:
+        prof, ppath, how = boardprofile.load(a.board, a.profile)
+        boardprofile.need(prof, "gnd", ppath, "gnd_drop.py")
+    except ValueError as e:
+        ap.error(str(e))
+    bad = boardprofile.unknown(prof, pad_ids(parse(text)))
+    if bad:
+        ap.error(
+            f"profile {ppath} names pads this board does not have: {', '.join(bad)}"
+        )
+    print(f"profile {ppath} ({how})")
+    g = {k: tuple(v) for k, v in prof["gnd"].items()}
+    pads, src, snk, info = solve(
+        text, a.h, (g["source"], g["sink"]), a.barrel_mohm * 1e-3, t_cu
+    )
     print(info)
     print(f"source {src}  sink {snk}")
     for lab in sorted(pads, key=lambda k: -(pads[k] or 0)):
@@ -419,11 +469,18 @@ def main():
             f"  {lab:34} "
             + ("  (ISLAND - not connected)" if v is None else f"{v * 1e3:8.4f} mohm")
         )
-    u2 = [k for k in pads if k.startswith("U2.2@")]
-    if u2:
-        print(
-            f"R_shared   V({src}) - V({u2[0]}) = {(pads[src] - pads[u2[0]]) * 1e3:.4f} mohm"
-        )
+    # R8, 2026-10-08: with no GND pad U2.2 (the Kelvin layouts) this line was skipped in silence (O16)
+    if "shared" in g:
+        u2 = [k for k in pads if k.startswith(pad_prefix(g["shared"]))]
+        if len(u2) == 1:
+            print(
+                f"R_shared   V({src}) - V({u2[0]}) = {(pads[src] - pads[u2[0]]) * 1e3:.4f} mohm"
+            )
+        else:
+            print(
+                f"R_shared   not solved: the profile's gnd.shared {boardprofile.label(g['shared'])} "
+                f"matches {len(u2)} GND pads {u2}, not 1"
+            )
     print(f"whole pour V({src}) - V({snk}) = {pads[src] * 1e3:.4f} mohm")
     return 0
 

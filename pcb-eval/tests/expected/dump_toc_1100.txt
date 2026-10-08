@@ -1,7 +1,8 @@
 == step 1: RUN dump exit 0
 -- stdout
 ok [13.45, 19.95, 43.05, 98.05, 29.6, 78.1] 19 fps 70 tracks 86 vias 2 zones copper_um {'F.Cu': 35.0, 'B.Cu': 35.0}
+profile {F}/toc_1100.pcb-eval.json (beside the board)
 -- stderr
 
 == files
-o.json sha256 feeb4506bcdaaece267fd77201f3a3cdf335d5cf511ee0ec52fceb4a5f7a3b6b lines 2874
+o.json sha256 7686e3cf60cda56a1cea13e234923871ca908907a58b5f8c6b4b424ab7efa5eb lines 2981

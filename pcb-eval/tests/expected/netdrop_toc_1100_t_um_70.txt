@@ -1,6 +1,7 @@
 == step 1: RUN netdrop exit 0
 -- stdout
 copper 70 um: --t-um
+profile {F}/toc_1100.pcb-eval.json (beside the board)
 BATT_RAW     0.413 mohm   h=0.1 contact=pad
 Batt_SW      0.635 mohm   h=0.1 contact=pad
 VIN+         3.406 mohm   h=0.1 contact=pad

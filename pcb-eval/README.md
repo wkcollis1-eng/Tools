@@ -33,15 +33,40 @@ python run.py <tool> [args...]     e.g. python run.py dump board.kicad_pcb dump.
 
 Each tool's docstring gives its own arguments.
 
-`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup. `rules.py` reads the design rules from a board that a `kicad/` tool has loaded; it is handed the board, so it imports nothing from KiCad.
+`common/` holds standard-library modules that tools in more than one folder import, so each rule is written once. It holds no tools. `copper.py` reads the copper thickness from a board's stackup. `rules.py` reads the design rules from a board that a `kicad/` tool has loaded; it is handed the board, so it imports nothing from KiCad. `boardprofile.py` reads and checks a board's profile.
 
-## Still tied to one board
+## Profiles
 
-These tools were copied as they were. The board-specific values are moving to a profile file beside each board, one tool at a time. Until then:
+Which pads a net runs between, and which pads a ground pour runs from and to, cannot be read from the board. They are in a profile: `<board stem>.pcb-eval.json` beside the board, or the file given with `--profile FILE` (`dump.py`: `profile=FILE`).
 
-- **Top Off Charger only:**
-  - `solve/tracknet.py`'s `PATHS` table (which pads each net runs between). `netdrop.py` imports it.
-  - `solve/gnd_drop.py`'s pad set (design doc §7.3).
+```json
+{
+  "about": "which board, and where these pads came from",
+  "paths": {"NET": [[["REF", "PAD"], ["REF", "PAD"]], [["REF", null]]]},
+  "total": {"name": "label of the sum line", "nets": ["NET"]},
+  "gnd": {"source": ["REF", null], "sink": ["REF", "PAD"], "shared": ["REF", "PAD"]}
+}
+```
+
+- `paths`: each net's two ends. An end is a list of pads solved as one node; `null` means every pad of that reference on the net. Read by `tracknet.py` and `netdrop.py`.
+- `total` (optional): the nets `tracknet.py` adds up, and the label of that line.
+- `gnd`: the GND pour's source and sink. `shared` (optional) is a pad whose drop from the source `gnd_drop.py` prints as `R_shared`. When it matches no GND pad or more than one, gnd_drop prints `R_shared   not solved` with the count. Until 2026-10-08 it left the line out without saying so; on the rev 0.8 Top Off Charger, U2.2 is not a GND pad.
+
+`dump.py`, `netdrop.py` and `gnd_drop.py` print the profile they used and whether it was given or found beside the board. `dump.py` copies the profile into the dump with its file name; `tracknet.py` reads it from there and prints that name for each dump.
+
+A tool refuses:
+
+- a board with no profile. There is no default. Until 2026-10-08 every board got the Top Off Charger's pads; on the UPS Monitor THT board `gnd_drop.py` printed a drop table from TB2 to TB1 without saying whose pads those were.
+- a key it does not know, a pad the board does not have, or a profile without the section it needs;
+- in `tracknet.py`, a dump with no profile, or two dumps whose profiles name different nets or sums.
+
+`tests/fixtures/toc_1100.pcb-eval.json` is the Top Off Charger's: the old `PATHS` table and gnd_drop pad set, verbatim. Start another board's profile from it, with that board's pads.
+
+## Board-specific values
+
+These tools were copied as they were. What was tied to one board is now read from the board or from its profile:
+
+- **Read from the board's profile (2026-10-08):** `solve/tracknet.py`'s `PATHS` table, which `netdrop.py` imported, and `solve/gnd_drop.py`'s pad set (design doc §7.3). Both were the Top Off Charger's, for every board.
 - **Read from the board (2026-10-08):**
   - `kicad/viamove.py`'s clearance, hole-to-hole and copper-to-edge come from the board's design settings, and it prints them on its first line. It refuses a board that has a netclass with another clearance or a `.kicad_dru`, because it applies one clearance to every net and no custom rules. Until then they were the Top Off Charger's `0.2, 0.25, 0.5`, hard-coded.
   - `kicad/inplace.py`'s clearance and copper-to-edge come from the same reading (`common/rules.py`), printed on its second line. It refuses the same boards unless given `clearance_mm`. Until then they defaulted to the Top Off Charger's `0.2` and `0.5`.
@@ -73,6 +98,8 @@ The suite runs every tool through `run.py` on public boards (`tests/fixtures/SOU
 - a module moved past the board edge;
 - other design rules, a netclass with another clearance, and a `.kicad_dru` (viamove, inplace);
 - 70 µm copper, F.Cu and B.Cu of different thickness, and no stackup (gnd_drop, netdrop, inplace, and dump with dumpdiff and tracknet), and a dump written before `copper_um` existed (dumpdiff, tracknet).
+
+Profile faults need no board copy. The case writes the bad profile itself (a key the tools do not know, a pad the board lacks, one net fewer than the other dump's), or runs a board that has none (dump, tracknet, netdrop, gnd_drop).
 
 Each fault case names a pattern its output must contain. The clean case beside it must not contain that pattern. `--record` will not write a case whose patterns fail.
 

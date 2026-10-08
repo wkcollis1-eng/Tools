@@ -15,9 +15,12 @@ B.Cu over its own copper as one ideal node. Leaves out solder joints, pins, sock
 
 The copper thickness is the board's own, from its stackup (common/copper.py), and is printed first;
 --t-um overrides it. Until 2026-10-08 it was 35 um, fixed.
+The nets and the pads each runs between are the board profile's paths (common/boardprofile.py): --profile,
+else <stem>.pcb-eval.json beside the board, printed second; a board with neither is refused. --net picks
+some of them. Until 2026-10-08 they were tracknet.py's PATHS, the Top Off Charger's, for every board.
 
 usage:
-  python netdrop.py <board> [--h 0.05] [--contact pad|drill] [--net NET ...] [--t-um N]
+  python netdrop.py <board> [--h 0.05] [--contact pad|drill] [--net NET ...] [--t-um N] [--profile FILE]
   python netdrop.py --self-test
 """
 
@@ -33,13 +36,14 @@ from scipy.sparse.csgraph import connected_components
 # gnd_drop and tracknet sit beside this file in Tools/pcb-eval/solve (2026-10-08: was the
 # DIY-LiFePO4-UPS repo's Top-Off-Charger/pcb and each kit's tools/), also when imported
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gnd_drop import RHO, kid, kids, netname, parse, xf  # noqa: E402
-from tracknet import PATHS  # noqa: E402  (one definition of which pads each net runs between)
+from gnd_drop import RHO, kid, kids, netname, pad_ids, parse, xf  # noqa: E402
 
+# tracknet's PATHS, imported here until 2026-10-08, moved to each board's profile
 sys.path.insert(
     0,
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
 )
+import boardprofile  # noqa: E402  (one copy of what a board's profile holds)
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
 
@@ -317,26 +321,56 @@ def main():
     ap.add_argument("board", nargs="?")
     ap.add_argument("--h", type=float, default=0.05)
     ap.add_argument("--contact", choices=("pad", "drill"), default="pad")
-    ap.add_argument("--net", nargs="*", default=list(PATHS))
+    ap.add_argument(
+        "--net",
+        nargs="*",
+        default=None,
+        help="nets to solve (default: every net in the profile's paths)",
+    )
     ap.add_argument(
         "--t-um",
         type=float,
         default=None,
         help="copper thickness, um (default: the board's stackup)",
     )
+    ap.add_argument(
+        "--profile",
+        default=None,
+        help="the board's profile json (default: <board stem>.pcb-eval.json beside it)",
+    )
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
         return self_test()
+    if a.board is None:
+        ap.error("the board file is required")
     text = open(a.board, encoding="utf-8").read()
     try:
         t_cu, line = copper.thickness(copper.layers(text), a.t_um)
     except ValueError as e:
         ap.error(f"copper: {e}; give --t-um")
     print(line)
+    try:
+        prof, ppath, how = boardprofile.load(a.board, a.profile)
+        boardprofile.need(prof, "paths", ppath, "netdrop.py")
+    except ValueError as e:
+        ap.error(str(e))
     T = parse(text)
-    for net in a.net:
-        frm, to = PATHS[net]
+    bad = boardprofile.unknown(prof, pad_ids(T))
+    if bad:
+        ap.error(
+            f"profile {ppath} names pads this board does not have: {', '.join(bad)}"
+        )
+    paths = boardprofile.paths(prof)
+    nets = list(paths) if a.net is None else a.net
+    lost = [n for n in nets if n not in paths]
+    if lost:
+        ap.error(
+            f"--net {' '.join(lost)}: not in the profile's paths ({', '.join(paths)})"
+        )
+    print(f"profile {ppath} ({how})")
+    for net in nets:
+        frm, to = paths[net]
         try:
             r = solve(T, net, frm, to, a.h, a.contact, t_cu)
             print(f"{net:9} {r * 1e3:8.3f} mohm   h={a.h} contact={a.contact}")

@@ -1,7 +1,10 @@
 """Dump a board to json: edge, copper thickness, footprints with pads, tracks, vias, zones, texts (KiCad python).
-usage: dump.py <board.kicad_pcb> <out.json>     the input to dumpdiff.py and tracknet.py
+usage: dump.py <board.kicad_pcb> <out.json> [profile=FILE]     the input to dumpdiff.py and tracknet.py
 copper_um is common/copper.py's layers(): each stackup copper layer's thickness in um, null with no stackup.
-Added 2026-10-08 so tracknet.py reads the board's copper; tracknet refuses a dump without it."""
+Added 2026-10-08 so tracknet.py reads the board's copper; tracknet refuses a dump without it.
+profile is the board's profile (common/boardprofile.py: profile=FILE, else <stem>.pcb-eval.json beside the
+board), copied in with its file name as profile_file; both null when there is none, which tracknet.py
+refuses. An invalid profile is refused here. Added 2026-10-08, when tracknet.py's PATHS moved to profiles."""
 
 import os
 import sys
@@ -12,8 +15,21 @@ sys.path.insert(
     0,
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "common"),
 )
+import boardprofile  # noqa: E402  (one copy of what a board's profile holds)
 import copper  # noqa: E402  (one copy of how a board's copper thickness is read)
 
+PROF = next((a[8:] for a in sys.argv[3:] if a.startswith("profile=")), None)
+try:
+    prof, ppath, how = boardprofile.load(sys.argv[1], PROF, "profile=FILE")
+    pline = f"profile {ppath} ({how})"
+except boardprofile.Missing as e:
+    prof, ppath, pline = (
+        None,
+        None,
+        f"profile none; tracknet.py will refuse this dump ({e})",
+    )
+except ValueError as e:
+    sys.exit(str(e))
 b = pcbnew.LoadBoard(sys.argv[1])
 mm = pcbnew.ToMM
 out = {}
@@ -27,6 +43,8 @@ out["edge"] = [
     mm(bb.GetHeight()),
 ]
 out["copper_um"] = copper.layers(open(sys.argv[1], encoding="utf-8").read())
+out["profile"] = prof
+out["profile_file"] = os.path.basename(ppath) if ppath else None
 ds = b.GetDesignSettings()
 fps = []
 for f in b.GetFootprints():
@@ -141,3 +159,4 @@ print(
     "copper_um",
     out["copper_um"],
 )
+print(pline)

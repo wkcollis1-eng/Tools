@@ -1,0 +1,7 @@
+== step 1: WRITE p.json
+== step 2: RUN dump exit 1
+-- stdout
+
+-- stderr
+profile p.json: unknown keys ['path']; known: ['about', 'paths', 'total', 'gnd']
+== files

@@ -4,5 +4,9 @@ ok [-0.05, 5.45, 44.05, 82.55, 44.1, 77.1] 22 fps 62 tracks 84 vias 2 zones copp
 profile none; tracknet.py will refuse this dump (no profile: no {F}/ups_tht.pcb-eval.json; write one there or give profile=FILE)
 -- stderr
 
+== step 2: RUN tracknet exit 1
+-- stdout
+old: copper 35 um: stackup, F.Cu and B.Cu 35 um
+-- stderr
+a.json: no profile (dump.py found none, or predates 2026-10-08); re-run dump.py with profile=FILE
 == files
-o.json sha256 1654a6082a74f599809617a45f0ea3f8c16773ab0d40ec14a4548af246382df6 lines 2671

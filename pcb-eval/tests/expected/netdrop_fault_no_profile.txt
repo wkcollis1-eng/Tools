@@ -1,0 +1,9 @@
+== step 1: RUN netdrop exit 2
+-- stdout
+copper 35 um: stackup, F.Cu and B.Cu 35 um
+-- stderr
+usage: netdrop.py [-h] [--h H] [--contact {pad,drill}] [--net [NET ...]]
+                  [--t-um T_UM] [--profile PROFILE] [--self-test]
+                  [board]
+netdrop.py: error: no profile: no {F}/ups_tht.pcb-eval.json; write one there or give --profile FILE
+== files
