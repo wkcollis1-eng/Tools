@@ -1,6 +1,6 @@
 == step 1: RUN gnd_drop exit 0
 -- stdout
-h=0.1 mm  t=35 um  Rs=0.4926 mohm/sq  barrel=0.00 mohm  cells F=128826 B=158082  unknowns=273100  components=1  solve 0.6s
+h=0.1 mm  t=35 um  Rs=0.4926 mohm/sq  barrel=0.00 mohm  cells F=128826 B=158082  unknowns=273100  components=1  solve {t}s
 source TB2.2@(16.79,24.50)  sink TB1.1@(17.50,68.50)
   TB2.2@(16.79,24.50)                  1.9645 mohm
   NT1.1@(17.54,25.17)                  1.9645 mohm

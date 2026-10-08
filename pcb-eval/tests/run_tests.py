@@ -36,6 +36,9 @@ T1100, T1709, UT = (
 )
 DRC = ["CLI", "pcb", "drc", "--severity-all", "--format", "json", "-o"]
 NOISE = re.compile(r"^Adding duplicate image handler")
+# gnd_drop prints its wall-clock solve time. R13, 2026-10-08: 8317005 recorded "solve 0.6s", so the case
+# failed whenever the solve rounded to another tenth: reproduced as "solve 0.7s" under CPU load [M, n=2].
+TIMING = re.compile(r"\bsolve \d+\.\ds\b")
 WIDE = "w=VIN+:B.Cu:3.40:33.57,55.75,24.24,55.75"
 # R7: each fault case must show its fault, and the clean case beside it must not.
 OSH_OK = [(r"^ALL WITHIN OSH 2-LAYER LIMITS$", True), (r"^\s+FAIL ", False)]
@@ -258,6 +261,7 @@ def norm(data, tmp):
     for p, tag in ((F, "{F}"), (tmp, "{T}")):
         for form in (p, p.replace("\\", "/"), p.replace("/", "\\")):
             t = t.replace(form, tag)
+    t = TIMING.sub("solve {t}s", t)
     lines = [
         ln.rstrip() for ln in t.replace("\r\n", "\n").split("\n") if not NOISE.match(ln)
     ]
