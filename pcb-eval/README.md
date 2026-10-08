@@ -78,7 +78,12 @@ Proven on 2026-10-08:
 
 `kicad/outlines.py` and `kicad/islands.py` had never been run on a board with a known fault (UPS Monitor review, 2026-10-07). The fault cases above did that:
 
-- **`islands.py`** shows the island whose vias were deleted as `GND vias 0`. On the clean rev 0.8 Top Off Charger it also prints `GND vias 0  GND pads []` for four slivers that are connected: each one touches a U4 GND pad. The tool finds a pad by testing whether the pad's centre lies in the fill. A thermal-relief pad's centre sits in a cutout, so the test misses it. Until that is fixed, `GND pads []` does not mean that no pad touches the island.
+- **`islands.py`** found pads by testing whether the pad's centre lay in the fill. A thermal-relief pad's centre sits in a cutout, so the test missed it. On the clean rev 0.8 Top Off Charger, four connected slivers printed `GND vias 0  GND pads []`, each touching a U4 GND pad. Fixed the same day:
+  - a via or pad now counts when its copper on that layer overlaps the island;
+  - an island with neither is tagged `<- no GND via or pad`;
+  - the fault case must show the tag, and both clean boards must not.
+
+  Tracks are not checked, so a tagged island may still reach GND through a track. On the UPS Monitor THT board every island touches a GND pad, so there is no fault case for that board.
 - **`outlines.py`** prints each footprint's extents but not the board edge, so a module moved past the edge is not flagged. Compare the extents with the `edge` line from `dump.py` by hand. Its fault case has no pattern yet for this reason.
 
 ## How the move was proven

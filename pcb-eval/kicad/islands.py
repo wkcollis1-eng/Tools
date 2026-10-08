@@ -1,40 +1,86 @@
-# For each copper layer, list GND fill islands: area, bbox, and how many GND vias / PTH GND pads land in each.
+# For each copper layer, list GND fill islands: bbox, holes, and the GND vias and pads that touch each.
+# A via or pad touches an island when its copper on that layer, grown by 0.01 mm, overlaps the fill: a
+# pad on thermal reliefs sits in a cutout and meets the fill only at its spokes. Tracks are not checked,
+# so an island tagged "no GND via or pad" may still reach GND through a track.
+# R13 2026-10-08: vias and pads were counted when their centre lay in the fill. That missed every pad on
+# thermal reliefs: on the rev 0.8 Top Off Charger four slivers between U4's GND pins printed
+# "GND vias 0  GND pads []" though each touches a U4 GND pad, and the main pour listed none of the 17
+# GND pads it touches. Found by the pcb-eval fault tests (Tools 8317005).
 import sys
+
 import pcbnew
 
-b = pcbnew.LoadBoard(sys.argv[1])
-mm = pcbnew.ToMM
-gnd = [
-    v for v in b.GetTracks() if v.GetClass() == "PCB_VIA" and v.GetNetname() == "GND"
-]
-gpads = [p for f in b.GetFootprints() for p in f.Pads() if p.GetNetname() == "GND"]
-for lay, name in ((pcbnew.F_Cu, "F.Cu"), (pcbnew.B_Cu, "B.Cu")):
+GROW = pcbnew.FromMM(0.01)
+
+
+def copper(item, lay):
+    s = pcbnew.SHAPE_POLY_SET()
+    item.TransformShapeToPolygon(
+        s, lay, GROW, pcbnew.FromMM(0.005), pcbnew.ERROR_OUTSIDE
+    )
+    return s
+
+
+def touching(isl, shapes):
+    bb = isl.BBox()
+    hit = []
+    for item, s in shapes:
+        if s.OutlineCount() and s.BBox().Intersects(bb):
+            s2 = pcbnew.SHAPE_POLY_SET(s)
+            s2.BooleanIntersection(isl)
+            if s2.OutlineCount():
+                hit.append(item)
+    return hit
+
+
+def islands(b, lay, net="GND"):
+    """[(island, vias, pads)] for net's fill on layer lay; island is a SHAPE_POLY_SET with its holes."""
     merged = pcbnew.SHAPE_POLY_SET()
     for z in b.Zones():
-        if z.GetNetname() == "GND" and z.IsOnLayer(lay):
+        if z.GetNetname() == net and z.IsOnLayer(lay):
             merged.BooleanAdd(z.GetFilledPolysList(lay))
     merged.Simplify()
-    print(name, "islands", merged.OutlineCount())
+    vias = [
+        t for t in b.GetTracks() if t.GetClass() == "PCB_VIA" and t.GetNetname() == net
+    ]
+    pads = [
+        p
+        for f in b.GetFootprints()
+        for p in f.Pads()
+        if p.GetNetname() == net and p.IsOnLayer(lay)
+    ]
+    vs = [(v, copper(v, lay)) for v in vias]
+    ps = [(p, copper(p, lay)) for p in pads]
+    out = []
     for i in range(merged.OutlineCount()):
-        o = merged.Outline(i)
-        bb = o.BBox()
-        area = merged.Area() if merged.OutlineCount() == 1 else None
-        nv = sum(1 for v in gnd if merged.Contains(v.GetPosition(), i))
-        npd = [
-            p.GetParentFootprint().GetReference() + "." + p.GetNumber()
-            for p in gpads
-            if merged.Contains(p.GetPosition(), i)
-        ]
-        print(
-            "  #%d bbox x %.2f-%.2f y %.2f-%.2f  holes %d  GND vias %d  GND pads %s"
-            % (
-                i,
-                mm(bb.GetX()),
-                mm(bb.GetRight()),
-                mm(bb.GetY()),
-                mm(bb.GetBottom()),
-                merged.HoleCount(i),
-                nv,
-                npd,
+        isl = merged.Subset(i, i + 1)
+        out.append((isl, touching(isl, vs), touching(isl, ps)))
+    return out
+
+
+if __name__ == "__main__":
+    b = pcbnew.LoadBoard(sys.argv[1])
+    mm = pcbnew.ToMM
+    for lay, name in ((pcbnew.F_Cu, "F.Cu"), (pcbnew.B_Cu, "B.Cu")):
+        found = islands(b, lay)
+        print(name, "islands", len(found))
+        for i, (isl, vias, pads) in enumerate(found):
+            bb = isl.BBox()
+            npd = [
+                p.GetParentFootprint().GetReference() + "." + p.GetNumber()
+                for p in pads
+            ]
+            print(
+                "  #%d bbox x %.2f-%.2f y %.2f-%.2f  holes %d  GND vias %d  GND pads %s%s"
+                % (
+                    i,
+                    mm(bb.GetX()),
+                    mm(bb.GetRight()),
+                    mm(bb.GetY()),
+                    mm(bb.GetBottom()),
+                    isl.HoleCount(0),
+                    len(vias),
+                    npd,
+                    "" if vias or pads else "  <- no GND via or pad",
+                )
             )
-        )

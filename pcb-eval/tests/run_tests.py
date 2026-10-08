@@ -43,8 +43,7 @@ OSH_DRILL = [
     (r"^\s+FAIL min plated drill\s+0\.2000 mm", True),
     (r"^OUTSIDE OSH LIMITS: min plated drill$", True),
 ]
-ISL_TOC = r"bbox x 33\.55-42\.50 y 95\.45-97\.50 .*GND vias 0 "  # the island make_fault.py cuts off
-ISL_UT = r"bbox x 7\.80-25\.35 y 31\.08-38\.75 .*GND vias 0 "
+ISL_CUT = r"GND vias 0  GND pads \[\]  <- no GND via or pad$"  # islands.py's tag for a cut-off island
 DUMP_SAME = [
     (r"^edge True ", True),
     (r"^fps added \[\] removed \[\]$", True),
@@ -72,8 +71,8 @@ CASES = [
         OSH_DRILL,
     ),
     ("inplace toc_1100", [["RUN", "inplace", T1100, "VIN+", "B.Cu"]], [], []),
-    ("islands toc_1100", [["RUN", "islands", T1100]], [], [(ISL_TOC, False)]),
-    ("islands ups_tht", [["RUN", "islands", UT]], [], [(ISL_UT, False)]),
+    ("islands toc_1100", [["RUN", "islands", T1100]], [], [(ISL_CUT, False)]),
+    ("islands ups_tht", [["RUN", "islands", UT]], [], [(ISL_CUT, False)]),
     (
         "islands fault toc_1100",
         [
@@ -81,17 +80,11 @@ CASES = [
             ["RUN", "islands", "f.kicad_pcb"],
         ],
         [],
-        [(ISL_TOC, True)],
+        [(ISL_CUT, True)],
     ),
-    (
-        "islands fault ups_tht",
-        [
-            ["KPY", "make_fault.py", "island", UT, "f.kicad_pcb"],
-            ["RUN", "islands", "f.kicad_pcb"],
-        ],
-        [],
-        [(ISL_UT, True)],
-    ),
+    # R13 2026-10-08: an "islands fault ups_tht" case, added in 8317005, was removed. Every F.Cu island on
+    # ups_tht touches a GND pad, so deleting its vias cuts none off. The old centre test hid that, and the
+    # case passed on an island still tied through U2.2 and C2.1.
     (
         "narrow toc_1100",
         [["RUN", "narrow", T1100, "o.kicad_pcb", "1.5", "NONE"]],
